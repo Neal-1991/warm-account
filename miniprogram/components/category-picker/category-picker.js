@@ -70,13 +70,15 @@ Component({
     onConfirm() {
       const big = this.data.bigCategories.find(b => b._id === this.data.selectedBigId)
       const child = this.data.childCategories.find(c => c._id === this.data.selectedChildId)
-      if (child && big) {
-        this.triggerEvent('select', {
-          categoryId: child._id,
-          categoryName: child.name,
-          icon: big.icon || ''
-        })
+      if (!child || !big) {
+        wx.showToast({ title: '请选择分类', icon: 'none' })
+        return
       }
+      this.triggerEvent('select', {
+        categoryId: child._id,
+        categoryName: child.name,
+        icon: big.icon || ''
+      })
     },
     onClose() {
       this.triggerEvent('close')

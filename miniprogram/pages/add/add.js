@@ -11,7 +11,8 @@ Page({
     images: [],
     showCategoryPicker: false,
     categories: [],
-    canSubmit: false
+    canSubmit: false,
+    submitting: false
   },
 
   onLoad() {
@@ -32,9 +33,12 @@ Page({
     }).then(res => {
       if (res.result && res.result.success) {
         this.setData({ categories: res.result.categories })
+      } else {
+        wx.showToast({ title: '分类加载失败', icon: 'none' })
       }
     }).catch(err => {
       console.error('loadCategories error:', err)
+      wx.showToast({ title: '分类加载失败', icon: 'none' })
     })
   },
 
@@ -112,12 +116,17 @@ Page({
 
   checkCanSubmit() {
     const { amount, selectedCategory } = this.data
+    const amountNum = parseFloat(amount)
     this.setData({
-      canSubmit: parseFloat(amount) > 0 && selectedCategory.id !== null
+      canSubmit: !isNaN(amountNum) && amountNum > 0 && selectedCategory.id !== null
     })
   },
 
   onSubmit() {
+    if (this.data.submitting) {
+      return
+    }
+
     const app = getApp()
     if (!app.globalData.bookId) {
       wx.showToast({ title: '请先登录', icon: 'none' })
@@ -126,6 +135,13 @@ Page({
 
     const { type, amount, selectedCategory, date, remark, images } = this.data
 
+    const amountNum = parseFloat(amount)
+    if (isNaN(amountNum) || amountNum <= 0) {
+      wx.showToast({ title: '请输入有效金额', icon: 'none' })
+      return
+    }
+
+    this.setData({ submitting: true })
     wx.showLoading({ title: '提交中...' })
 
     wx.cloud.callFunction({
@@ -135,7 +151,7 @@ Page({
         bookId: app.globalData.bookId,
         data: {
           type,
-          amount: Math.round(parseFloat(amount) * 100),
+          amount: Math.round(amountNum * 100),
           categoryId: selectedCategory.id,
           date,
           remark,
@@ -146,6 +162,7 @@ Page({
       }
     }).then(res => {
       wx.hideLoading()
+      this.setData({ submitting: false })
       if (res.result && res.result.success) {
         wx.showToast({ title: '提交成功' })
         setTimeout(() => {
@@ -156,6 +173,7 @@ Page({
       }
     }).catch(err => {
       wx.hideLoading()
+      this.setData({ submitting: false })
       console.error('onSubmit error:', err)
       wx.showToast({ title: '提交失败', icon: 'none' })
     })
