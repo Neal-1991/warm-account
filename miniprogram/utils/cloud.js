@@ -1,7 +1,6 @@
 // miniprogram/utils/cloud.js
 const config = require('./config')
 
-let initialized = false
 let db = null
 
 /**
@@ -9,11 +8,9 @@ let db = null
  * @returns {Object} database instance
  */
 export function initCloud() {
-  if (!initialized) {
-    wx.cloud.init({ env: config.env })
-    initialized = true
-  }
-  return getDb()
+  wx.cloud.init({ env: config.env })
+  db = wx.cloud.database()
+  return db
 }
 
 /**
@@ -23,7 +20,6 @@ export function initCloud() {
 export function getDb() {
   if (!db) {
     initCloud()
-    db = wx.cloud.database()
   }
   return db
 }
