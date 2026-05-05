@@ -1,0 +1,48 @@
+.summary-card {
+  margin: 20rpx 30rpx;
+  border-radius: 16rpx;
+  padding: 30rpx;
+  color: #FFFFFF;
+}
+
+.month-label {
+  text-align: center;
+  font-size: 28rpx;
+  opacity: 0.9;
+  margin-bottom: 20rpx;
+}
+
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+}
+
+.summary-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+}
+
+.label {
+  font-size: 24rpx;
+  opacity: 0.8;
+  margin-bottom: 8rpx;
+}
+
+.value {
+  font-size: 32rpx;
+  font-weight: bold;
+}
+
+.expense {
+  color: #FFE5E5;
+}
+
+.income {
+  color: #E5FFE5;
+}
+
+.balance {
+  color: #FFFFFF;
+}

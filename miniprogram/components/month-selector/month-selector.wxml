@@ -1,0 +1,5 @@
+<view class="month-selector">
+  <text class="arrow prev" bindtap="prevMonth">&lt;</text>
+  <text class="current">{{currentMonth}}</text>
+  <text class="arrow next" bindtap="nextMonth">&gt;</text>
+</view>
