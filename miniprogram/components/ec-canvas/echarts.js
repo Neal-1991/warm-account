@@ -1,12 +1,7 @@
 // ECharts for WeChat mini-program
-// Uses echarts from npm package
+// Copy from node_modules/echarts/dist/echarts.min.js
 
-// Import from the npm installed echarts
-// In WeChat miniprogram, we use the dist/echarts.js
-import * as echarts from '../../../../node_modules/echarts/dist/echarts.js'
+const echarts = require('../../utils/echarts.min.js')
 
-// For webpack/bundler environment, you could also try:
-// import * as echarts from 'echarts'
-
-export default echarts
-export { echarts }
+module.exports = echarts
+module.exports.default = echarts

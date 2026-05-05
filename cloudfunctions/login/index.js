@@ -3,12 +3,15 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 exports.main = async (event, context) => {
   try {
-    const { openId, nickName, avatarUrl } = event
+    const { nickName, avatarUrl } = event
 
-    // Validate required fields
-    if (!openId) {
-      return { success: false, error: 'openId is required' }
-    }
+    // 通过云函数获取用户信息（服务端获取，无需前端传 openId）
+    const cloudUserInfo = cloud.getUserInfo({
+      appId: 'wx91ea4c0ab404f9bc',
+      cloudId: 'cloud1-2gaj8t3s919e662e'
+    })
+
+    const openId = cloudUserInfo.openId
 
     const db = cloud.database()
     const books = await db.collection('books')
@@ -17,7 +20,7 @@ exports.main = async (event, context) => {
       .get()
 
     if (books.data.length > 0) {
-      return { success: true, bookId: books.data[0]._id, isNew: false }
+      return { success: true, bookId: books.data[0]._id, isNew: false, openId }
     }
 
     const { id } = await db.collection('books').add({
@@ -32,7 +35,7 @@ exports.main = async (event, context) => {
       }
     })
 
-    return { success: true, bookId: id, isNew: true }
+    return { success: true, bookId: id, isNew: true, openId }
   } catch (err) {
     console.error('login cloud function error:', err)
     return { success: false, error: err.message || 'unknown error' }

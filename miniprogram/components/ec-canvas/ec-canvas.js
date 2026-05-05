@@ -1,4 +1,4 @@
-import * as echarts from 'echarts'
+const echarts = require('../../utils/echarts.min.js')
 
 Component({
   properties: {
