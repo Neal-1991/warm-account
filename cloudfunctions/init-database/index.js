@@ -18,6 +18,10 @@ const CATEGORIES = [
 exports.main = async (event, context) => {
   const { bookId } = event
 
+  if (!bookId) {
+    return { success: false, error: 'bookId is required for init-database' }
+  }
+
   try {
     // 创建大类
     for (const cat of CATEGORIES) {

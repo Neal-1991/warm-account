@@ -32,6 +32,9 @@ exports.main = async (event, context) => {
         return { success: true, book: books.data[0] || null }
       }
       case 'generateInviteCode': {
+        if (!bookId) {
+          return { success: false, error: 'bookId is required' }
+        }
         // 生成6位邀请码，24小时有效期
         const code = String(Math.floor(Math.random() * 900000) + 100000)
         await db.collection('books').doc(bookId).update({
