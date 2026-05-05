@@ -1,0 +1,6 @@
+Place PNG files in this directory. Required files:
+- home.png, home-active.png
+- stat.png, stat-active.png
+- mine.png, mine-active.png
+- logo.png
+- default-avatar.png
