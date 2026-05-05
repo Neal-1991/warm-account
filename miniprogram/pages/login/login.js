@@ -1,8 +1,9 @@
-// miniprogram/pages/login/login.js
 const config = require('../../utils/config')
 
 Page({
-  data: {},
+  data: {
+    loading: false
+  },
 
   onLoad() {
     // Check if already logged in
@@ -13,38 +14,50 @@ Page({
   },
 
   onLogin(e) {
-    if (e.detail.userInfo) {
-      const { nickName, avatarUrl } = e.detail.userInfo
-
-      // Get openId via cloud
-      wx.cloud.init({ env: config.env })
-      wx.cloud.callFunction({
-        name: 'login',
-        data: { nickName, avatarUrl }
-      }).then(res => {
-        if (res.result.success) {
-          const app = getApp()
-          app.globalData.bookId = res.result.bookId
-          app.globalData.userInfo = { nickName, avatarUrl }
-          app.globalData.openId = res.result.openId || 'demo-openid'
-
-          // Initialize categories if new user
-          if (res.result.isNew) {
-            wx.cloud.callFunction({
-              name: 'init-database',
-              data: { bookId: res.result.bookId }
-            })
-          }
-
-          wx.switchTab({ url: '/pages/index/index' })
-        } else {
-          wx.showToast({ title: res.result.error || '登录失败', icon: 'none' })
-        }
-      }).catch(err => {
-        console.error('Login failed:', err)
-        wx.showToast({ title: '登录失败', icon: 'none' })
-      })
+    if (!e.detail.userInfo) {
+      wx.showToast({ title: '需要授权才能登录', icon: 'none' })
+      return
     }
+
+    this.setData({ loading: true })
+    wx.showLoading({ title: '登录中...' })
+
+    const { nickName, avatarUrl } = e.detail.userInfo
+
+    wx.cloud.init({ env: config.env })
+    wx.cloud.callFunction({
+      name: 'login',
+      data: { nickName, avatarUrl }
+    }).then(res => {
+      wx.hideLoading()
+      this.setData({ loading: false })
+
+      if (res.result.success) {
+        const app = getApp()
+        app.globalData.bookId = res.result.bookId
+        app.globalData.userInfo = { nickName, avatarUrl }
+        app.globalData.openId = res.result.openId || 'demo-openid'
+
+        // Initialize categories if new user
+        if (res.result.isNew) {
+          wx.cloud.callFunction({
+            name: 'init-database',
+            data: { bookId: res.result.bookId }
+          }).catch(err => {
+            console.error('init-database error:', err)
+          })
+        }
+
+        wx.switchTab({ url: '/pages/index/index' })
+      } else {
+        wx.showToast({ title: res.result.error || '登录失败', icon: 'none' })
+      }
+    }).catch(err => {
+      wx.hideLoading()
+      this.setData({ loading: false })
+      console.error('Login failed:', err)
+      wx.showToast({ title: '登录失败，请重试', icon: 'none' })
+    })
   },
 
   openAgreement() {
