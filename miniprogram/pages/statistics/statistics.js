@@ -1,4 +1,4 @@
-const echarts = require('../../utils/echarts')  // Using echarts mini port
+const echarts = require('../../utils/echarts')
 const dateUtil = require('../../utils/date')
 
 Page({
@@ -25,6 +25,13 @@ Page({
     this.loadData()
   },
 
+  onUnload() {
+    if (this.chart) {
+      this.chart.dispose()
+      this.chart = null
+    }
+  },
+
   initChart() {
     this.setData({
       ecChart: {
@@ -33,7 +40,6 @@ Page({
           canvas.setChart(chart)
           this.chart = chart
 
-          // Set initial empty option
           chart.setOption({
             series: [{
               type: 'pie',
@@ -72,17 +78,25 @@ Page({
         data: { month: this.data.currentMonth }
       }
     }).then(res => {
-      if (res.result && res.result.success) {
-        const records = res.result.records.filter(r => r.type === 'expense')
-        this.renderChart(records)
+      if (!res.result) {
+        wx.showToast({ title: '数据加载失败', icon: 'none' })
+        return
       }
+
+      if (!res.result.success) {
+        wx.showToast({ title: res.result.error || '数据加载失败', icon: 'none' })
+        return
+      }
+
+      const records = (res.result.records || []).filter(r => r.type === 'expense')
+      this.renderChart(records)
     }).catch(err => {
       console.error('loadData error:', err)
+      wx.showToast({ title: '数据加载失败', icon: 'none' })
     })
   },
 
   renderChart(records) {
-    // 按分类汇总
     const categoryMap = {}
     records.forEach(r => {
       if (!categoryMap[r.categoryId]) {
@@ -103,7 +117,6 @@ Page({
 
     const colors = ['#FF9500', '#FF6B00', '#FFD700', '#90EE90', '#87CEEB', '#DDA0DD', '#F0E68C', '#E6E6FA']
 
-    // Category ID to name mapping (simplified - would normally come from category data)
     const categoryNames = {
       'cat-food': '餐饮',
       'cat-transport': '交通',
