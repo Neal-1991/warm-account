@@ -1,0 +1,38 @@
+<view class="container">
+  <view class="family-info">
+    <text class="family-name">{{bookName}}</text>
+    <view class="invite-section">
+      <text class="invite-code" wx:if="{{inviteCode}}">邀请码：{{inviteCode}}</text>
+      <view class="invite-buttons">
+        <button class="invite-btn" bindtap="generateInviteCode">
+          {{inviteCode ? '重新生成' : '生成邀请码'}}
+        </button>
+        <button class="copy-btn" wx:if="{{inviteCode}}" bindtap="copyInviteCode">复制</button>
+      </view>
+    </view>
+  </view>
+
+  <view class="member-section">
+    <text class="section-title">家庭成员</text>
+    <view class="member-list">
+      <view class="member-item" wx:for="{{members}}" wx:key="openId">
+        <image class="member-avatar" src="{{item.avatarUrl || '/images/default-avatar.png'}}" />
+        <view class="member-info">
+          <text class="member-name">{{item.nickName}}</text>
+          <text class="member-role">{{item.role === 'admin' ? '管理员' : '成员'}}</text>
+        </view>
+        <text
+          class="remove-btn"
+          wx:if="{{item.openId !== currentOpenId && isAdmin}}"
+          bindtap="removeMember"
+          data-openid="{{item.openId}}"
+        >移除</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="join-section" wx:if="{{!isMember}}">
+    <input class="code-input" placeholder="输入邀请码" bindinput="onCodeInput" value="{{inputCode}}" />
+    <button class="join-btn" bindtap="joinFamily">加入家庭</button>
+  </view>
+</view>
