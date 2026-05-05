@@ -1,4 +1,3 @@
-const echarts = require('../../utils/echarts')
 const dateUtil = require('../../utils/date')
 
 Page({
@@ -35,11 +34,8 @@ Page({
   initChart() {
     this.setData({
       ecChart: {
-        onInit: (canvas, width, height) => {
-          const chart = echarts.init(canvas, 'light')
-          canvas.setChart(chart)
+        onInit: (chart, width, height) => {
           this.chart = chart
-
           chart.setOption({
             series: [{
               type: 'pie',
@@ -47,8 +43,6 @@ Page({
               data: []
             }]
           })
-
-          return chart
         }
       }
     })
