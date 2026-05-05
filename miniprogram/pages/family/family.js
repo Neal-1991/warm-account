@@ -102,6 +102,9 @@ Page({
       data: this.data.inviteCode,
       success: () => {
         wx.showToast({ title: '已复制', icon: 'success' })
+      },
+      fail: () => {
+        wx.showToast({ title: '复制失败', icon: 'none' })
       }
     })
   },
@@ -112,7 +115,7 @@ Page({
 
   joinFamily() {
     const { inputCode } = this.data
-    if (!inputCode || inputCode.length !== 6) {
+    if (!inputCode || inputCode.length !== 6 || !/^\d{6}$/.test(inputCode)) {
       wx.showToast({ title: '请输入6位邀请码', icon: 'none' })
       return
     }
@@ -147,8 +150,8 @@ Page({
       content: '确定要移除该成员吗？',
       success: res => {
         if (res.confirm) {
-          // TODO: Implement remove member cloud function
-          wx.showToast({ title: '功能开发中', icon: 'none' })
+          // TODO: Implement remove member cloud function when backend adds support
+        wx.showToast({ title: '移除功能开发中', icon: 'none' })
         }
       }
     })
