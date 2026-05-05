@@ -46,6 +46,12 @@ Page({
         data: { month: this.data.currentMonth }
       }
     }).then(res => {
+      if (!res.result) {
+        console.error('loadData: no result returned')
+        wx.showToast({ title: '数据加载失败', icon: 'none' })
+        return
+      }
+
       if (res.result.success) {
         const records = res.result.records.map(r => ({
           ...r,
@@ -75,9 +81,13 @@ Page({
             balance: (summary.balance / 100).toFixed(2)
           }
         })
+      } else {
+        console.error('loadData: success false', res.result.error)
+        wx.showToast({ title: '数据加载失败', icon: 'none' })
       }
     }).catch(err => {
       console.error('loadData error:', err)
+      wx.showToast({ title: '数据加载失败', icon: 'none' })
     })
   },
 
