@@ -1,0 +1,27 @@
+{
+  "pages": [
+    "pages/login/login",
+    "pages/index/index",
+    "pages/statistics/statistics",
+    "pages/add/add",
+    "pages/mine/mine",
+    "pages/family/family",
+    "pages/about/about"
+  ],
+  "tabBar": {
+    "color": "#999999",
+    "selectedColor": "#FF9500",
+    "backgroundColor": "#FFFFFF",
+    "list": [
+      { "pagePath": "pages/index/index", "text": "首页", "iconPath": "images/home.png", "selectedIconPath": "images/home-active.png" },
+      { "pagePath": "pages/statistics/statistics", "text": "统计", "iconPath": "images/stat.png", "selectedIconPath": "images/stat-active.png" },
+      { "pagePath": "pages/mine/mine", "text": "我的", "iconPath": "images/mine.png", "selectedIconPath": "images/mine-active.png" }
+    ]
+  },
+  "window": {
+    "backgroundTextStyle": "light",
+    "navigationBarBackgroundColor": "#FF9500",
+    "navigationBarTitleText": "暖账",
+    "navigationBarTextStyle": "white"
+  }
+}
