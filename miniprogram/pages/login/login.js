@@ -6,7 +6,6 @@ Page({
   },
 
   onLoad() {
-    // Check if already logged in
     const app = getApp()
     if (app.globalData.openId) {
       wx.switchTab({ url: '/pages/index/index' })
@@ -25,9 +24,26 @@ Page({
     const { nickName, avatarUrl } = e.detail.userInfo
 
     wx.cloud.init({ env: config.env })
+
+    // 先获取用户的 openId
+    wx.cloud.getUserInfo({
+      success: (res) => {
+        const openId = res.openid
+        this.doLogin(openId, nickName, avatarUrl)
+      },
+      fail: (err) => {
+        wx.hideLoading()
+        this.setData({ loading: false })
+        console.error('getUserInfo failed:', err)
+        wx.showToast({ title: '获取用户信息失败', icon: 'none' })
+      }
+    })
+  },
+
+  doLogin(openId, nickName, avatarUrl) {
     wx.cloud.callFunction({
       name: 'login',
-      data: { nickName, avatarUrl }
+      data: { openId, nickName, avatarUrl }
     }).then(res => {
       wx.hideLoading()
       this.setData({ loading: false })
@@ -36,9 +52,8 @@ Page({
         const app = getApp()
         app.globalData.bookId = res.result.bookId
         app.globalData.userInfo = { nickName, avatarUrl }
-        app.globalData.openId = res.result.openId || 'demo-openid'
+        app.globalData.openId = openId
 
-        // Initialize categories if new user
         if (res.result.isNew) {
           wx.cloud.callFunction({
             name: 'init-database',
