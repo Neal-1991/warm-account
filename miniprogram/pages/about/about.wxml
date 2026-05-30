@@ -9,11 +9,11 @@
   <view class="links">
     <view class="link-item" bindtap="openTerms">
       <text class="label">用户协议</text>
-      <text class="arrow">&gt;</text>
+      <text class="arrow">›</text>
     </view>
     <view class="link-item" bindtap="openPrivacy">
       <text class="label">隐私政策</text>
-      <text class="arrow">&gt;</text>
+      <text class="arrow">›</text>
     </view>
   </view>
 </view>

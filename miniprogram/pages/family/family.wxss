@@ -22,36 +22,49 @@
   flex-direction: column;
 }
 
-.invite-code {
-  font-size: 36rpx;
-  color: #FF9500;
-  font-weight: bold;
+.invite-code-hint {
+  display: flex;
+  align-items: center;
   margin-bottom: 20rpx;
 }
 
-.invite-buttons {
-  display: flex;
+.invite-code-label {
+  font-size: 28rpx;
+  color: #999;
 }
 
-.invite-btn,
-.copy-btn {
-  height: 64rpx;
-  line-height: 64rpx;
-  padding: 0 30rpx;
-  font-size: 26rpx;
-  border-radius: 32rpx;
-  margin-right: 20rpx;
+.invite-code-value {
+  font-size: 36rpx;
+  color: #FF9500;
+  font-weight: bold;
+  margin-right: 12rpx;
+}
+
+.invite-code-tip {
+  font-size: 22rpx;
+  color: #ccc;
+  background: #f5f5f5;
+  padding: 4rpx 12rpx;
+  border-radius: 8rpx;
 }
 
 .invite-btn {
+  width: 100%;
+  height: 80rpx;
+  line-height: 80rpx;
   background: #FF9500;
   color: #FFF;
+  border-radius: 40rpx;
+  font-size: 30rpx;
+  font-weight: bold;
+  text-align: center;
 }
 
-.copy-btn {
-  background: #F5F5F5;
-  color: #666;
+.invite-btn::after {
+  border: none;
 }
+
+/* ==================== 成员列表 ==================== */
 
 .member-section {
   background: #FFFFFF;
@@ -112,32 +125,81 @@
   color: #FF6B00;
 }
 
-.join-section {
-  background: #FFFFFF;
-  padding: 30rpx;
+/* ==================== 弹窗 ==================== */
+
+.dialog-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
   display: flex;
-  flex-direction: column;
   align-items: center;
+  justify-content: center;
+  z-index: 1000;
 }
 
-.code-input {
-  width: 100%;
-  height: 88rpx;
-  border: 1px solid #EEE;
-  border-radius: 44rpx;
-  padding: 0 30rpx;
-  font-size: 30rpx;
+.dialog-card {
+  width: 560rpx;
+  background: #FFFFFF;
+  border-radius: 20rpx;
+  overflow: hidden;
+}
+
+.dialog-body {
+  padding: 50rpx 40rpx 40rpx;
   text-align: center;
-  margin-bottom: 30rpx;
 }
 
-.join-btn {
-  width: 100%;
-  height: 88rpx;
-  line-height: 88rpx;
-  background: #FF9500;
-  color: #FFF;
-  border-radius: 44rpx;
-  font-size: 32rpx;
+.dialog-title {
+  font-size: 36rpx;
   font-weight: bold;
+  color: #333;
+  display: block;
+  margin-bottom: 16rpx;
+  line-height: 1.4;
+}
+
+.dialog-desc {
+  font-size: 26rpx;
+  color: #999;
+  display: block;
+  line-height: 1.5;
+}
+
+.dialog-actions {
+  display: flex;
+  border-top: 1px solid #F0F0F0;
+}
+
+.dialog-actions-single {
+  justify-content: center;
+}
+
+.dialog-btn-cancel,
+.dialog-btn-confirm {
+  flex: 1;
+  height: 96rpx;
+  line-height: 96rpx;
+  font-size: 30rpx;
+  border-radius: 0;
+  border: none;
+  background: #FFFFFF;
+  text-align: center;
+}
+
+.dialog-btn-cancel {
+  color: #999;
+  border-right: 1px solid #F0F0F0;
+}
+
+.dialog-btn-confirm {
+  color: #FF9500;
+  font-weight: bold;
+}
+
+.dialog-btn-cancel::after,
+.dialog-btn-confirm::after {
+  border: none;
 }

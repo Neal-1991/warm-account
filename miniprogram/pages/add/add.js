@@ -1,4 +1,5 @@
 const dateUtil = require('../../utils/date')
+const config = require('../../utils/config')
 
 Page({
   data: {
@@ -27,9 +28,10 @@ Page({
 
   loadCategories() {
     const app = getApp()
+    const { type } = this.data
     wx.cloud.callFunction({
       name: 'category',
-      data: { action: 'list', bookId: app.globalData.bookId }
+      data: { action: 'list', bookId: app.globalData.bookId, isTest: config.isTest, type }
     }).then(res => {
       if (res.result && res.result.success) {
         this.setData({ categories: res.result.categories })
@@ -44,6 +46,7 @@ Page({
 
   switchType(e) {
     this.setData({ type: e.currentTarget.dataset.type })
+    this.loadCategories()  // 切换类型时重新加载对应分类
     this.checkCanSubmit()
   },
 
@@ -76,7 +79,8 @@ Page({
         action: 'addChild',
         bookId: app.globalData.bookId,
         name: e.detail.name,
-        parentId: e.detail.parentId
+        parentId: e.detail.parentId,
+        isTest: config.isTest
       }
     }).then(() => {
       this.loadCategories()
@@ -118,8 +122,21 @@ Page({
     const { amount, selectedCategory } = this.data
     const amountNum = parseFloat(amount)
     this.setData({
-      canSubmit: !isNaN(amountNum) && amountNum > 0 && selectedCategory.id !== null
+      canSubmit: !isNaN(amountNum) && amountNum > 0 && selectedCategory.categoryId != null
     })
+  },
+
+  // 上传图片到云存储，返回 cloud file ID 列表
+  uploadImages(tempPaths) {
+    if (!tempPaths || tempPaths.length === 0) {
+      return Promise.resolve([])
+    }
+    return Promise.all(tempPaths.map(path =>
+      wx.cloud.uploadFile({
+        cloudPath: `record_images/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.jpg`,
+        filePath: path
+      })
+    )).then(results => results.map(r => r.fileID))
   },
 
   onSubmit() {
@@ -142,40 +159,57 @@ Page({
     }
 
     this.setData({ submitting: true })
-    wx.showLoading({ title: '提交中...' })
 
-    wx.cloud.callFunction({
-      name: 'record',
-      data: {
-        action: 'add',
-        bookId: app.globalData.bookId,
+    const doSubmit = (cloudFileIds) => {
+      wx.showLoading({ title: '提交中...' })
+      wx.cloud.callFunction({
+        name: 'record',
         data: {
-          type,
-          amount: Math.round(amountNum * 100),
-          categoryId: selectedCategory.id,
-          date,
-          remark,
-          images,
-          openId: app.globalData.openId,
-          nickName: app.globalData.userInfo?.nickName || '未知'
+          action: 'add',
+          bookId: app.globalData.bookId,
+          data: {
+            type,
+            amount: Math.round(amountNum * 100),
+            categoryId: selectedCategory.categoryId,
+            date,
+            remark,
+            images: cloudFileIds,
+            openId: app.globalData.openId,
+            nickName: app.globalData.userInfo?.nickName || '未知'
+          },
+          isTest: config.isTest
         }
-      }
-    }).then(res => {
-      wx.hideLoading()
-      this.setData({ submitting: false })
-      if (res.result && res.result.success) {
-        wx.showToast({ title: '提交成功' })
-        setTimeout(() => {
-          wx.switchTab({ url: '/pages/index/index' })
-        }, 1500)
-      } else {
-        wx.showToast({ title: res.result?.error || '提交失败', icon: 'none' })
-      }
-    }).catch(err => {
-      wx.hideLoading()
-      this.setData({ submitting: false })
-      console.error('onSubmit error:', err)
-      wx.showToast({ title: '提交失败', icon: 'none' })
-    })
+      }).then(res => {
+        wx.hideLoading()
+        this.setData({ submitting: false })
+        if (res.result && res.result.success) {
+          wx.showToast({ title: '提交成功' })
+          setTimeout(() => {
+            wx.switchTab({ url: '/pages/index/index' })
+          }, 1500)
+        } else {
+          wx.showToast({ title: res.result?.error || '提交失败', icon: 'none' })
+        }
+      }).catch(err => {
+        wx.hideLoading()
+        this.setData({ submitting: false })
+        console.error('onSubmit error:', err)
+        wx.showToast({ title: '提交失败', icon: 'none' })
+      })
+    }
+
+    if (images.length > 0) {
+      wx.showLoading({ title: '上传图片中...' })
+      this.uploadImages(images).then(cloudFileIds => {
+        doSubmit(cloudFileIds)
+      }).catch(err => {
+        wx.hideLoading()
+        this.setData({ submitting: false })
+        console.error('uploadImages error:', err)
+        wx.showToast({ title: '图片上传失败', icon: 'none' })
+      })
+    } else {
+      doSubmit([])
+    }
   }
 })

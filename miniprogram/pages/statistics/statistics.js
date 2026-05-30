@@ -1,4 +1,5 @@
 const dateUtil = require('../../utils/date')
+const config = require('../../utils/config')
 
 Page({
   data: {
@@ -64,14 +65,42 @@ Page({
       return
     }
 
+    // 先获取分类列表，构建 id -> 父分类名（大类）映射
     wx.cloud.callFunction({
-      name: 'record',
-      data: {
-        action: 'list',
-        bookId: app.globalData.bookId,
-        data: { month: this.data.currentMonth }
+      name: 'category',
+      data: { action: 'list', bookId: app.globalData.bookId, isTest: config.isTest }
+    }).then(catRes => {
+      const categoryParentMap = {}
+      if (catRes.result && catRes.result.categories) {
+        const cats = catRes.result.categories
+        // 先建大类自己的映射
+        const bigNames = {}
+        cats.forEach(c => {
+          if (c.parentId === null) {
+            bigNames[c._id] = c.name
+          }
+        })
+        // 所有分类映射到父分类名
+        cats.forEach(c => {
+          if (c.parentId === null) {
+            categoryParentMap[c._id] = c.name
+          } else {
+            categoryParentMap[c._id] = bigNames[c.parentId] || c.name
+          }
+        })
       }
-    }).then(res => {
+
+      // 再获取记录列表
+      return wx.cloud.callFunction({
+        name: 'record',
+        data: {
+          action: 'list',
+          bookId: app.globalData.bookId,
+          data: { month: this.data.currentMonth },
+          isTest: config.isTest
+        }
+      }).then(res => [categoryParentMap, res])
+    }).then(([categoryParentMap, res]) => {
       if (!res.result) {
         wx.showToast({ title: '数据加载失败', icon: 'none' })
         return
@@ -83,23 +112,25 @@ Page({
       }
 
       const records = (res.result.records || []).filter(r => r.type === 'expense')
-      this.renderChart(records)
+      this.renderChart(records, categoryParentMap)
     }).catch(err => {
       console.error('loadData error:', err)
       wx.showToast({ title: '数据加载失败', icon: 'none' })
     })
   },
 
-  renderChart(records) {
-    const categoryMap = {}
+  renderChart(records, categoryParentMap) {
+    // 按大类（父分类）聚合金额
+    const amountMap = {}
     records.forEach(r => {
-      if (!categoryMap[r.categoryId]) {
-        categoryMap[r.categoryId] = 0
+      const parentName = categoryParentMap[r.categoryId] || '未分类'
+      if (!amountMap[parentName]) {
+        amountMap[parentName] = 0
       }
-      categoryMap[r.categoryId] += r.amount
+      amountMap[parentName] += r.amount
     })
 
-    const total = Object.values(categoryMap).reduce((a, b) => a + b, 0)
+    const total = Object.values(amountMap).reduce((a, b) => a + b, 0)
 
     if (total === 0) {
       this.setData({ legend: [], chartData: [] })
@@ -111,31 +142,19 @@ Page({
 
     const colors = ['#FF9500', '#FF6B00', '#FFD700', '#90EE90', '#87CEEB', '#DDA0DD', '#F0E68C', '#E6E6FA']
 
-    const categoryNames = {
-      'cat-food': '餐饮',
-      'cat-transport': '交通',
-      'cat-shopping': '购物',
-      'cat-medical': '医疗',
-      'cat-education': '教育',
-      'cat-entertainment': '娱乐',
-      'cat-housing': '居住',
-      'cat-gift': '人情'
-    }
+    // 按金额降序排列
+    const sorted = Object.entries(amountMap).sort((a, b) => b[1] - a[1])
 
-    let idx = 0
-    const chartData = Object.entries(categoryMap).map(([catId, amount]) => {
-      const name = categoryNames[catId] || catId
-      return {
-        name,
-        value: (amount / 100).toFixed(2),
-        itemStyle: { color: colors[idx++ % colors.length] }
-      }
-    })
+    const chartData = sorted.map(([name, amount], idx) => ({
+      name,
+      value: (amount / 100).toFixed(2),
+      itemStyle: { color: colors[idx % colors.length] }
+    }))
 
     const legendData = chartData.map(d => ({
       name: d.name,
       amount: d.value,
-      percent: (parseFloat(d.value) / (total / 100)).toFixed(1),
+      percent: (parseFloat(d.value) / (total / 100) * 100).toFixed(1),
       color: d.itemStyle.color
     }))
 

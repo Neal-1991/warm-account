@@ -13,9 +13,17 @@
       <text class="separator">和</text>
       <text class="link" bindtap="openPrivacy">《隐私政策》</text>
     </view>
+    <view class="checkbox-row">
+      <checkbox-group bindchange="onAgreementChange">
+        <label class="checkbox-label">
+          <checkbox value="agreed" color="#FF6B00"/>
+          <text class="checkbox-text">我已阅读并同意以上协议</text>
+        </label>
+      </checkbox-group>
+    </view>
   </view>
 
-  <button class="login-btn" type="primary" bindgetuserinfo="onLogin" open-type="getUserInfo" disabled="{{loading}}">
+  <button class="login-btn" type="primary" bindgetuserinfo="onLogin" open-type="getUserInfo" disabled="{{loading || !agreed}}">
     微信一键登录
   </button>
 </view>

@@ -64,6 +64,21 @@
   margin: 0 10rpx;
 }
 
+.checkbox-row {
+  margin-top: 30rpx;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.checkbox-text {
+  font-size: 24rpx;
+  margin-left: 10rpx;
+}
+
 .login-btn {
   width: 600rpx;
   height: 96rpx;
@@ -74,6 +89,11 @@
   font-weight: bold;
   border-radius: 48rpx;
   border: none;
+}
+
+.login-btn[disabled] {
+  background: #CCCCCC;
+  color: #FFFFFF;
 }
 
 .login-btn::after {

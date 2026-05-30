@@ -3,8 +3,15 @@ const cloud = require('wx-server-sdk')
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const db = cloud.database()
 
+// 获取集合名称（根据环境后缀）
+const getCollectionName = (event, name) => {
+  const suffix = event.isTest !== undefined ? (event.isTest ? '_test' : '_prod') : '_test'
+  return `${name}${suffix}`
+}
+
 exports.main = async (event, context) => {
-  const { action, bookId, recordId, data } = event
+  const { action, bookId, recordId, data, isTest } = event
+  const collectionName = (name) => getCollectionName(event, name)
 
   try {
     switch (action) {
@@ -17,7 +24,7 @@ exports.main = async (event, context) => {
           return { success: false, error: 'Missing required fields: type, amount, categoryId, date' }
         }
 
-        const { id } = await db.collection('records').add({
+        const { _id } = await db.collection(collectionName('records')).add({
           data: {
             bookId,
             type: data.type,         // 'expense' | 'income'
@@ -32,7 +39,7 @@ exports.main = async (event, context) => {
             updatedAt: db.serverDate()
           }
         })
-        return { success: true, recordId: id }
+        return { success: true, recordId: _id }
       }
       case 'list': {
         if (!bookId) {
@@ -42,7 +49,7 @@ exports.main = async (event, context) => {
         const startDate = new Date(month + '-01')
         const endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 1)
 
-        const records = await db.collection('records')
+        const records = await db.collection(collectionName('records'))
           .where({
             bookId,
             date: db.command.gte(startDate).and(db.command.lt(endDate))
@@ -56,7 +63,7 @@ exports.main = async (event, context) => {
         if (!recordId) {
           return { success: false, error: 'recordId is required' }
         }
-        await db.collection('records').doc(recordId).update({
+        await db.collection(collectionName('records')).doc(recordId).update({
           data: { ...data, updatedAt: db.serverDate() }
         })
         return { success: true }
@@ -65,8 +72,27 @@ exports.main = async (event, context) => {
         if (!recordId) {
           return { success: false, error: 'recordId is required' }
         }
-        await db.collection('records').doc(recordId).remove()
+        await db.collection(collectionName('records')).doc(recordId).remove()
         return { success: true }
+      }
+      case 'updateCreatedByName': {
+        const { openId, nickName } = data
+        if (!openId || !nickName) {
+          return { success: false, error: 'openId and nickName are required' }
+        }
+        const result = await db.collection(collectionName('records'))
+          .where({ createdBy: openId })
+          .update({ data: { createdByName: nickName, updatedAt: db.serverDate() } })
+        return { success: true, updatedCount: result.stats.updated }
+      }
+
+      case 'getFileUrl': {
+        const fileList = event.fileList || []
+        if (fileList.length === 0) {
+          return { success: false, error: 'fileList is required' }
+        }
+        const res = await cloud.getTempFileURL({ fileList })
+        return { success: true, fileList: res.fileList }
       }
       default:
         return { success: false, error: 'unknown action' }

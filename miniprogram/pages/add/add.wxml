@@ -18,7 +18,7 @@
       <view class="value">
         <text class="category-icon">{{selectedCategory.icon}}</text>
         <text class="category-name">{{selectedCategory.name || '请选择'}}</text>
-        <text class="arrow">&gt;</text>
+        <text class="arrow">›</text>
       </view>
     </view>
 
@@ -28,7 +28,7 @@
       <picker mode="date" value="{{date}}" bindchange="onDateChange">
         <view class="value">
           <text>{{dateDisplay}}</text>
-          <text class="arrow">&gt;</text>
+          <text class="arrow">›</text>
         </view>
       </picker>
     </view>
@@ -61,6 +61,7 @@
   <category-picker
     visible="{{showCategoryPicker}}"
     categories="{{categories}}"
+    type="{{type}}"
     bind:select="onCategorySelect"
     bind:close="closeCategoryPicker"
     bind:addchild="onAddChild"

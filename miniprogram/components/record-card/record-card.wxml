@@ -1,7 +1,10 @@
 <view class="record-card">
   <view class="icon">{{icon}}</view>
   <view class="info">
-    <view class="category">{{categoryName}}</view>
+    <view class="category">
+      {{categoryName}}
+      <text wx:if="{{hasImages}}" class="image-indicator">📷</text>
+    </view>
     <view class="remark" wx:if="{{remark}}">{{remark}}</view>
   </view>
   <view class="amount-section">

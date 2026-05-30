@@ -6,7 +6,8 @@
     "pages/add/add",
     "pages/mine/mine",
     "pages/family/family",
-    "pages/about/about"
+    "pages/about/about",
+    "pages/detail/detail"
   ],
   "tabBar": {
     "color": "#999999",
@@ -18,6 +19,7 @@
       { "pagePath": "pages/mine/mine", "text": "我的", "iconPath": "images/mine.png", "selectedIconPath": "images/mine-active.png" }
     ]
   },
+  "lazyCodeLoading": "requiredComponents",
   "window": {
     "backgroundTextStyle": "light",
     "navigationBarBackgroundColor": "#FF9500",

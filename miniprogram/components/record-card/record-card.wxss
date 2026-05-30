@@ -23,6 +23,11 @@
   font-weight: 500;
 }
 
+.image-indicator {
+  font-size: 24rpx;
+  margin-left: 8rpx;
+}
+
 .remark {
   font-size: 24rpx;
   color: #999;

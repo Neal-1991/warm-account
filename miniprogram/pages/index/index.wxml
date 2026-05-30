@@ -12,15 +12,18 @@
 
   <view class="record-list">
     <block wx:for="{{records}}" wx:key="_id">
-      <record-card
-        icon="{{item.icon}}"
-        categoryName="{{item.categoryName}}"
-        remark="{{item.remark}}"
-        type="{{item.type}}"
-        amount="{{item.amountDisplay}}"
-        dateStr="{{item.dateStr}}"
-        createdByName="{{item.createdByName}}"
-      />
+      <view bindtap="onRecordTap" data-record-id="{{item._id}}">
+        <record-card
+          icon="{{item.icon}}"
+          categoryName="{{item.categoryName}}"
+          remark="{{item.remark}}"
+          type="{{item.type}}"
+          amount="{{item.amountDisplay}}"
+          dateStr="{{item.dateStr}}"
+          createdByName="{{item.createdByName}}"
+          hasImages="{{item.hasImages}}"
+        />
+      </view>
     </block>
     <view wx:if="{{records.length === 0}}" class="empty">
       <text>本月暂无账目</text>

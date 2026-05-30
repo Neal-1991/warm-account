@@ -1,0 +1,51 @@
+<view class="container">
+  <!-- 记录信息卡片 -->
+  <view class="info-card">
+    <view class="category-row">
+      <text class="icon">{{record.icon}}</text>
+      <text class="category-name">{{record.categoryName}}</text>
+    </view>
+    <view class="amount {{record.type}}">
+      {{record.type === 'expense' ? '-' : '+'}}¥{{record.amountDisplay}}
+    </view>
+    <view class="date">{{record.dateStr}}</view>
+  </view>
+
+  <!-- 备注 -->
+  <view class="section" wx:if="{{record.remark}}">
+    <text class="section-title">备注</text>
+    <text class="remark-content">{{record.remark}}</text>
+  </view>
+
+  <!-- 图片 -->
+  <view class="section" wx:if="{{images.length > 0}}">
+    <text class="section-title">图片 ({{images.length}})</text>
+    <view class="image-grid">
+      <image
+        wx:for="{{images}}" wx:key="*this"
+        src="{{item}}"
+        mode="aspectFill"
+        class="record-image"
+        bindtap="previewImage"
+        data-index="{{index}}"
+      />
+    </view>
+  </view>
+
+  <!-- 记账信息 -->
+  <view class="section meta-section">
+    <view class="meta-row">
+      <text class="meta-label">记账人</text>
+      <text class="meta-value">{{record.createdByName}}</text>
+    </view>
+    <view class="meta-row">
+      <text class="meta-label">类型</text>
+      <text class="meta-value">{{record.type === 'expense' ? '支出' : '收入'}}</text>
+    </view>
+  </view>
+
+  <!-- 操作按钮 -->
+  <view class="actions" wx:if="{{canDelete}}">
+    <button class="delete-btn" bindtap="onDelete">删除记录</button>
+  </view>
+</view>

@@ -1,7 +1,8 @@
 Component({
   properties: {
     visible: { type: Boolean, value: false },
-    categories: { type: Array }
+    categories: { type: Array },
+    type: { type: String, value: 'expense' }  // expense 或 income
   },
   data: {
     bigCategories: [],
@@ -19,23 +20,46 @@ Component({
   observers: {
     'categories': function() {
       this.initCategories()
+    },
+    'type': function() {
+      this.initCategories()
     }
   },
   methods: {
     initCategories() {
       const cats = this.properties.categories || []
-      const big = cats.filter(c => c.parentId === null)
+      const typeFilter = this.properties.type || 'expense'
+      // 过滤指定type的大类，按名称去重（防止 init-database 多次调用导致重复）
+      const seen = new Set()
+      const big = cats.filter(c => {
+        if (c.parentId === null && c.type === typeFilter && !seen.has(c.name)) {
+          seen.add(c.name)
+          return true
+        }
+        return false
+      })
       this.setData({
         bigCategories: big,
         selectedBigId: big[0]?._id || null
       })
       if (big[0]) {
         this.updateChildren(big[0]._id)
+      } else {
+        this.setData({ childCategories: [], selectedChildId: null })
       }
     },
     updateChildren(bigId) {
       const cats = this.properties.categories || []
-      const children = cats.filter(c => c.parentId === bigId)
+      // 找到该大类名称，收集所有同名大类的 _id（处理重复系统分类）
+      const bigCat = cats.find(c => c._id === bigId && c.parentId === null)
+      if (!bigCat) {
+        this.setData({ childCategories: [], selectedChildId: null })
+        return
+      }
+      const allBigIds = cats
+        .filter(c => c.parentId === null && c.name === bigCat.name)
+        .map(c => c._id)
+      const children = cats.filter(c => allBigIds.includes(c.parentId))
       this.setData({
         childCategories: children,
         selectedChildId: children[0]?._id || null

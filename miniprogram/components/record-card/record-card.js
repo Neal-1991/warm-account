@@ -7,7 +7,8 @@ Component({
     type: { type: String },
     amount: { type: String },
     dateStr: { type: String },
-    createdByName: { type: String }
+    createdByName: { type: String },
+    hasImages: { type: Boolean, value: false }
   },
   data: {},
   methods: {

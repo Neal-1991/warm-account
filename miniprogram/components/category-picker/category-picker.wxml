@@ -8,10 +8,10 @@
     <view class="big-categories">
       <view
         wx:for="{{bigCategories}}"
-        wx:key="id"
-        class="big-cat-item {{selectedBigId === item.id ? 'active' : ''}}"
+        wx:key="_id"
+        class="big-cat-item {{selectedBigId === item._id ? 'active' : ''}}"
         bindtap="selectBig"
-        data-id="{{item.id}}"
+        data-id="{{item._id}}"
       >
         <text class="icon">{{item.icon}}</text>
         <text class="name">{{item.name}}</text>
@@ -19,11 +19,11 @@
     </view>
 
     <view class="child-categories">
-      <block wx:for="{{childCategories}}" wx:key="id">
+      <block wx:for="{{childCategories}}" wx:key="_id">
         <view
-          class="child-item {{selectedChildId === item.id ? 'active' : ''}}"
+          class="child-item {{selectedChildId === item._id ? 'active' : ''}}"
           bindtap="selectChild"
-          data-id="{{item.id}}"
+          data-id="{{item._id}}"
           data-name="{{item.name}}"
         >
           {{item.name}}
