@@ -55,8 +55,9 @@ App({
   logout() {
     this.globalData.openId = null
     this.globalData.bookId = null
-    // 注意：不清除 userInfo，保留用户修改的头像和昵称
+    this.globalData.userInfo = null
     wx.removeStorageSync('openId')
     wx.removeStorageSync('bookId')
+    wx.removeStorageSync('userInfo')
   }
 })

@@ -36,6 +36,8 @@ Page({
   loadData() {
     const app = getApp()
     if (!app.globalData.bookId) {
+      // 未登录时展示空状态，不请求数据
+      this.setData({ records: [], summary: { expense: '0.00', income: '0.00', balance: '0.00' } })
       return
     }
 
@@ -128,6 +130,10 @@ Page({
   },
 
   goToAdd() {
+    if (!getApp().globalData.bookId) {
+      wx.navigateTo({ url: '/pages/login/login' })
+      return
+    }
     wx.navigateTo({ url: '/pages/add/add' })
   },
 

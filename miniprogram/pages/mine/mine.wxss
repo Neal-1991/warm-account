@@ -72,6 +72,21 @@
   border: none;
 }
 
+.login-btn {
+  margin: 40rpx 30rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+  background: #FF9500;
+  color: #FFFFFF;
+  border-radius: 44rpx;
+  font-size: 32rpx;
+  font-weight: bold;
+}
+
+.login-btn::after {
+  border: none;
+}
+
 /* 头像区域 */
 .avatar-section {
   position: relative;

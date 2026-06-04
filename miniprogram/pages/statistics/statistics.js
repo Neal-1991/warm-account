@@ -62,6 +62,9 @@ Page({
   loadData() {
     const app = getApp()
     if (!app.globalData.bookId) {
+      // 未登录时展示空状态，不请求数据
+      this.setData({ legend: [], chartData: [] })
+      if (this.chart) this.chart.setOption({ series: [{ data: [] }] })
       return
     }
 

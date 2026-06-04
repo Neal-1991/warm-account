@@ -18,10 +18,17 @@ Page({
   loadUserInfo() {
     const app = getApp()
     const userInfo = app.getUserInfo()
+    const isLoggedIn = !!app.globalData.openId
     this.setData({
       userInfo,
+      isLoggedIn,
       editingNickName: userInfo?.nickName || ''
     })
+  },
+
+  // 导航到登录页
+  goToLogin() {
+    wx.navigateTo({ url: '/pages/login/login' })
   },
 
   // 昵称输入（手动输入）
@@ -37,6 +44,10 @@ Page({
   },
 
   goToFamily() {
+    if (!getApp().globalData.openId) {
+      wx.navigateTo({ url: '/pages/login/login' })
+      return
+    }
     wx.navigateTo({ url: '/pages/family/family' })
   },
 
@@ -46,6 +57,10 @@ Page({
 
   // 显示编辑弹窗
   onShowEditModal() {
+    if (!getApp().globalData.openId) {
+      wx.navigateTo({ url: '/pages/login/login' })
+      return
+    }
     const userInfo = this.data.userInfo || {}
     this.setData({
       showEditModal: true,

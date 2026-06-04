@@ -9,7 +9,12 @@ Page({
   onLoad() {
     const app = getApp()
     if (app.globalData.openId) {
-      wx.switchTab({ url: '/pages/index/index' })
+      const pages = getCurrentPages()
+      if (pages.length > 1) {
+        wx.navigateBack()
+      } else {
+        wx.switchTab({ url: '/pages/index/index' })
+      }
     }
   },
 
@@ -71,7 +76,12 @@ Page({
           wx.removeStorageSync('pendingInviteCode')
           wx.redirectTo({ url: `/pages/family/family?inviteCode=${pendingCode}` })
         } else {
-          wx.switchTab({ url: '/pages/index/index' })
+          const pages = getCurrentPages()
+          if (pages.length > 1) {
+            wx.navigateBack()
+          } else {
+            wx.switchTab({ url: '/pages/index/index' })
+          }
         }
       } else {
         wx.showToast({ title: res.result.error || '登录失败', icon: 'none' })
