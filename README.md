@@ -1,0 +1,109 @@
+# 暖账
+
+家庭协作记账微信小程序。家庭成员共同记录日常收支，通过分类统计和饼图查看消费结构。
+
+## 功能
+
+- 日常收支记录（支出/收入）
+- 分类管理（9 个支出大类 + 7 个收入大类，支持自定义小类）
+- 月度统计环形饼图
+- 图片上传与查看（最多 9 张/条）
+- 家庭协作：邀请码制，成员共享账本
+- 游客模式：未登录可浏览界面
+
+## 技术栈
+
+- 前端：微信小程序原生框架 + ECharts
+- 后端：微信云开发（云函数 + 云数据库 + 云存储）
+- 数据库：类 MongoDB 文档数据库
+
+## 快速开始
+
+### 1. 环境准备
+
+```bash
+# 安装依赖
+npm install
+
+# 配置环境（首次使用）
+cp miniprogram/utils/env.example.js miniprogram/utils/env.js
+```
+
+编辑 `miniprogram/utils/env.js`，填入你的云开发环境 ID 和小程序 AppID：
+
+```js
+module.exports = {
+  env: 'your-cloud-env-id',
+  appId: 'your-miniprogram-appid'
+}
+```
+
+### 2. 导入项目
+
+1. 下载[微信开发者工具](https://developers.weixin.qq.com/miniprogram/dev/devtools/download.html)
+2. 导入项目，选择 `miniprogram/` 目录
+3. 在 `project.config.json` 中修改 `appid` 为你的小程序 AppID
+
+### 3. 部署云函数
+
+在微信开发者工具中，右键 `cloudfunctions/` 下的每个函数，选择「上传并部署：云端安装依赖」。
+
+### 4. 初始化数据库
+
+在云开发控制台创建以下集合：
+
+| 集合 | 说明 |
+|------|------|
+| `books_prod` | 账本 |
+| `records_prod` | 记账记录 |
+| `categories_prod` | 分类 |
+| `members_prod` | 成员信息 |
+
+如需测试环境，将 `config.js` 中 `isTest` 改为 `true`，并创建对应 `_test` 后缀集合。
+
+### 5. 切换环境
+
+编辑 `miniprogram/utils/config.js`：
+
+```js
+const isTest = true   // 测试环境
+const isTest = false  // 生产环境
+```
+
+## 项目结构
+
+```
+├── cloudfunctions/           # 后端云函数
+│   ├── login/                #   微信登录 + 成员资料
+│   ├── book/                 #   账本 CRUD + 邀请码
+│   ├── record/               #   记账记录 CRUD
+│   ├── category/             #   分类管理
+│   ├── init-database/        #   初始化默认分类
+│   └── init-collections/     #   数据库集合说明
+├── miniprogram/              # 前端
+│   ├── pages/                #   8 个页面
+│   │   ├── index/            #     首页：月份选择、汇总卡片、记录列表
+│   │   ├── add/              #     记一笔：金额/分类/日期/备注/图片
+│   │   ├── statistics/       #     统计：ECharts 饼图 + 图例
+│   │   ├── mine/             #     我的：头像昵称、家庭管理
+│   │   ├── family/           #     家庭：邀请码、成员列表
+│   │   ├── login/            #     登录：微信授权
+│   │   ├── about/            #     关于：版本、协议
+│   │   └── detail/           #     记录详情：图片预览、删除
+│   ├── components/           #   5 个可复用组件
+│   └── utils/                #   工具函数 + ECharts
+└── project.config.json       # 微信开发者工具配置
+```
+
+## 环境切换
+
+通过 `miniprogram/utils/config.js` 中 `isTest` 字段控制：
+
+- `true`：操作 `_test` 后缀集合
+- `false`：操作 `_prod` 后缀集合
+
+云函数通过前端传入的 `isTest` 参数决定操作哪个集合。
+
+## License
+
+MIT
