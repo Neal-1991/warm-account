@@ -2,8 +2,10 @@
 // TODO: 修改 isTest 为 false 切换到生产环境
 const isTest = false  // true = 测试环境，false = 生产环境
 
+const envConfig = require('./env')
+
 module.exports = {
-  env: 'cloud1-2gaj8t3s919e662e',  // 云开发环境ID（只有一个）
+  env: envConfig.env,  // 从 env.js 读取（不纳入版本控制）
 
   // 集合后缀：测试环境加 _test，生产环境加 _prod
   suffix: isTest ? '_test' : '_prod',
