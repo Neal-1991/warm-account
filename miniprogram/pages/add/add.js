@@ -161,7 +161,7 @@ Page({
     }
     return Promise.all(tempPaths.map(path =>
       wx.cloud.uploadFile({
-        cloudPath: `record_images/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.jpg`,
+        cloudPath: `${config.isTest ? 'test' : 'prod'}/record_images/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.jpg`,
         filePath: path
       })
     )).then(results => results.map(r => r.fileID))

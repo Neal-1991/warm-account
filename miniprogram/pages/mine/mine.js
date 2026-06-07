@@ -140,7 +140,7 @@ Page({
     // chooseAvatar 返回的是本地临时路径，先上传到云存储持久化
     if (avatarUrl.startsWith('wxfile://') || avatarUrl.startsWith('http://tmp/')) {
       wx.showLoading({ title: '上传头像中...' })
-      const cloudPath = `avatars/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.jpg`
+      const cloudPath = `${config.isTest ? 'test' : 'prod'}/avatars/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.jpg`
       wx.cloud.uploadFile({ cloudPath, filePath: avatarUrl }).then(res => {
         wx.hideLoading()
         completeSave(res.fileID)
