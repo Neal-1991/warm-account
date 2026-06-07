@@ -215,8 +215,7 @@ Page({
       wx.hideLoading()
 
       if (res.result && res.result.success) {
-        app.globalData.bookId = res.result.bookId
-        wx.setStorageSync('bookId', res.result.bookId)
+        app.setBookId(res.result.bookId)
         this.setData({ dialogType: '', pendingInviteCode: '' })
         wx.showToast({ title: '加入成功', icon: 'success' })
         this.loadData()
@@ -254,8 +253,7 @@ Page({
           const openId = app.globalData?.openId || app.getOpenId()
           if (book.ownerId === openId || (book.memberIds || []).includes(openId)) {
             // 加入成功，更新 bookId
-            app.globalData.bookId = book._id
-            wx.setStorageSync('bookId', book._id)
+            app.setBookId(book._id)
             wx.showToast({ title: '加入成功', icon: 'success' })
             this.loadData()
             return

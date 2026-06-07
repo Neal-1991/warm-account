@@ -52,13 +52,11 @@ Page({
 
       if (res.result.success) {
         const app = getApp()
-        app.globalData.bookId = res.result.bookId
-        app.globalData.openId = res.result.openId
+        app.setBookId(res.result.bookId)
         app.setOpenId(res.result.openId)
 
         // 保存用户信息（优先使用云函数返回的持久化资料）
         const userInfo = res.result.userInfo || { nickName, avatarUrl }
-        app.globalData.userInfo = userInfo
         app.setUserInfo(userInfo)
 
         if (res.result.isNew) {
