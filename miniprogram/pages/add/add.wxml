@@ -65,5 +65,6 @@
     bind:select="onCategorySelect"
     bind:close="closeCategoryPicker"
     bind:addchild="onAddChild"
+    bind:addbig="onAddBig"
   />
 </view>

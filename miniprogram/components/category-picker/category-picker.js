@@ -1,16 +1,22 @@
+const config = require('../../utils/config')
+
 Component({
   properties: {
     visible: { type: Boolean, value: false },
     categories: { type: Array },
-    type: { type: String, value: 'expense' }  // expense 或 income
+    type: { type: String, value: 'expense' }
   },
   data: {
     bigCategories: [],
     childCategories: [],
     selectedBigId: null,
     selectedChildId: null,
+    selectedIsBig: false,
     showAddChild: false,
-    newChildName: ''
+    showAddBig: false,
+    newChildName: '',
+    newBigName: '',
+    newBigIcon: '📌'
   },
   lifetimes: {
     attached() {
@@ -23,13 +29,16 @@ Component({
     },
     'type': function() {
       this.initCategories()
+    },
+    'visible': function(val) {
+      // 每次打开时重新初始化（管理页返回后分类可能已变更）
+      if (val) this.initCategories()
     }
   },
   methods: {
     initCategories() {
       const cats = this.properties.categories || []
       const typeFilter = this.properties.type || 'expense'
-      // 过滤指定type的大类，按名称去重（防止 init-database 多次调用导致重复）
       const seen = new Set()
       const big = cats.filter(c => {
         if (c.parentId === null && c.type === typeFilter && !seen.has(c.name)) {
@@ -38,71 +47,133 @@ Component({
         }
         return false
       })
+      // 默认选中第一个大类
+      const firstId = big.length > 0 ? big[0]._id : null
       this.setData({
         bigCategories: big,
-        selectedBigId: big[0]?._id || null
+        selectedBigId: firstId,
+        selectedChildId: null,
+        selectedIsBig: false,
+        showAddChild: false,
+        showAddBig: false,
+        newChildName: '',
+        newBigName: '',
+        newBigIcon: '📌'
       })
-      if (big[0]) {
-        this.updateChildren(big[0]._id)
+      if (firstId) {
+        this.updateChildren(firstId)
       } else {
         this.setData({ childCategories: [], selectedChildId: null })
       }
     },
     updateChildren(bigId) {
       const cats = this.properties.categories || []
-      // 找到该大类名称，收集所有同名大类的 _id（处理重复系统分类）
       const bigCat = cats.find(c => c._id === bigId && c.parentId === null)
       if (!bigCat) {
         this.setData({ childCategories: [], selectedChildId: null })
         return
       }
+      // 收集同名大类的所有 _id（去重后的系统+自建合并情况）
       const allBigIds = cats
         .filter(c => c.parentId === null && c.name === bigCat.name)
         .map(c => c._id)
       const children = cats.filter(c => allBigIds.includes(c.parentId))
-      this.setData({
-        childCategories: children,
-        selectedChildId: children[0]?._id || null
-      })
+      this.setData({ childCategories: children })
     },
     selectBig(e) {
       const bigId = e.currentTarget.dataset.id
       this.setData({
         selectedBigId: bigId,
-        showAddChild: false
+        selectedChildId: null,
+        selectedIsBig: false,
+        showAddChild: false,
+        showAddBig: false
       })
       this.updateChildren(bigId)
     },
+    selectBigOnly() {
+      // 选择大类（记在大类下）
+      this.setData({
+        selectedIsBig: true,
+        selectedChildId: null
+      })
+    },
     selectChild(e) {
-      this.setData({ selectedChildId: e.currentTarget.dataset.id })
+      this.setData({
+        selectedChildId: e.currentTarget.dataset.id,
+        selectedIsBig: false
+      })
     },
+    // ===== 管理入口 =====
     onManage() {
-      this.setData({ showAddChild: true })
+      // 关闭选择器，跳转管理页
+      this.triggerEvent('close')
+      wx.navigateTo({ url: '/pages/category-manage/category-manage' })
     },
-    onAddInput(e) {
+    // ===== 添加小类 =====
+    onAddChildEntry() {
+      this.setData({ showAddChild: true, showAddBig: false })
+    },
+    onAddChildInput(e) {
       this.setData({ newChildName: e.detail.value })
     },
     confirmAddChild() {
-      if (this.data.newChildName.trim()) {
-        this.triggerEvent('addchild', {
-          name: this.data.newChildName.trim(),
-          parentId: this.data.selectedBigId
-        })
-        this.setData({ newChildName: '', showAddChild: false })
-      }
+      const name = this.data.newChildName.trim()
+      if (!name) return
+      this.triggerEvent('addchild', {
+        name,
+        parentId: this.data.selectedBigId
+      })
+      this.setData({ newChildName: '', showAddChild: false })
     },
+    // ===== 添加大类 =====
+    onAddBigEntry() {
+      this.setData({ showAddBig: true, showAddChild: false })
+    },
+    onAddBigNameInput(e) {
+      this.setData({ newBigName: e.detail.value })
+    },
+    onAddBigIconInput(e) {
+      this.setData({ newBigIcon: e.detail.value || '📌' })
+    },
+    confirmAddBig() {
+      const name = this.data.newBigName.trim()
+      if (!name) return
+      this.triggerEvent('addbig', {
+        name,
+        icon: this.data.newBigIcon || '📌',
+        type: this.properties.type
+      })
+      this.setData({ newBigName: '', newBigIcon: '📌', showAddBig: false })
+    },
+    // ===== 确定 =====
     onConfirm() {
       const big = this.data.bigCategories.find(b => b._id === this.data.selectedBigId)
-      const child = this.data.childCategories.find(c => c._id === this.data.selectedChildId)
-      if (!child || !big) {
+      if (!big) {
         wx.showToast({ title: '请选择分类', icon: 'none' })
         return
       }
-      this.triggerEvent('select', {
-        categoryId: child._id,
-        categoryName: child.name,
-        icon: big.icon || ''
-      })
+      if (this.data.selectedIsBig) {
+        // 选择的是大类
+        this.triggerEvent('select', {
+          categoryId: big._id,
+          categoryName: big.name,
+          icon: big.icon || '',
+          isBigCategory: true
+        })
+      } else {
+        const child = this.data.childCategories.find(c => c._id === this.data.selectedChildId)
+        if (!child) {
+          wx.showToast({ title: '请选择分类', icon: 'none' })
+          return
+        }
+        this.triggerEvent('select', {
+          categoryId: child._id,
+          categoryName: child.name,
+          icon: big.icon || '',
+          isBigCategory: false
+        })
+      }
     },
     onClose() {
       this.triggerEvent('close')

@@ -1,0 +1,135 @@
+<view class="container">
+  <!-- Tab 切换 -->
+  <view class="tabs">
+    <view class="tab {{activeTab === 'expense' ? 'active expense' : ''}}" bindtap="switchTab" data-tab="expense">支出</view>
+    <view class="tab {{activeTab === 'income' ? 'active income' : ''}}" bindtap="switchTab" data-tab="income">收入</view>
+  </view>
+
+  <!-- 分类列表 -->
+  <view class="category-list">
+    <block wx:for="{{bigCategories}}" wx:key="_id" wx:if="{{item.type === activeTab}}">
+      <!-- 大类 -->
+      <view class="big-section">
+        <view class="big-header">
+          <view class="big-info">
+            <text class="big-icon">{{item.icon}}</text>
+            <text class="big-name">{{item.name}}</text>
+            <text class="big-sub-count">{{childMap[item._id].length || 0}}个子类</text>
+            <text class="tag" wx:if="{{!item.isSystem}}">自建</text>
+          </view>
+          <view class="big-actions">
+            <text class="action-link" bindtap="onRenameBig" data-cat="{{item}}">改名</text>
+            <text class="action-link danger" wx:if="{{!item.isSystem}}" bindtap="onDeleteBig" data-cat="{{item}}">删除</text>
+          </view>
+        </view>
+        <!-- 子类 -->
+        <view class="child-list">
+          <block wx:for="{{childMap[item._id]}}" wx:key="_id">
+            <view class="child-row">
+              <text class="child-name">{{item.name}}</text>
+              <view class="child-actions">
+                <text class="action-link" bindtap="onRenameChild" data-cat="{{item}}">改名</text>
+                <text class="action-link danger" bindtap="onDeleteChild" data-cat="{{item}}">删除</text>
+              </view>
+            </view>
+          </block>
+          <view class="child-row add-row" bindtap="onAddChild" data-big-id="{{item._id}}">
+            <text class="add-text">+ 添加小类</text>
+          </view>
+        </view>
+      </view>
+    </block>
+  </view>
+
+  <!-- 底部添加大类 -->
+  <view class="bottom-bar">
+    <button class="add-big-btn" bindtap="onAddBig">+ 添加大类</button>
+  </view>
+</view>
+
+<!-- ====== 改名弹窗 ====== -->
+<view class="modal-mask" wx:if="{{showRename}}" catchtap="hideModals">
+  <view class="modal" catchtap="stopBubble">
+    <view class="modal-title">
+      {{renameTarget && renameTarget.parentId === null ? '修改大类' : '修改小类'}}
+    </view>
+    <view class="modal-body">
+      <block wx:if="{{renameTarget && renameTarget.parentId === null}}">
+        <view class="emoji-picker">
+          <block wx:for="{{['🍜','🚗','🛒','🏠','📱','👶','💄','👗','🎮','🏋','✈️','🐱','💊','🎁','📚','➕','💰','🏆','🏦','📈','💼','🧧','📦','📌','🎵','☕','🎂','🏥','📝','💻']}}" wx:key="*this">
+            <text class="emoji-opt {{renameIcon === item ? 'selected' : ''}}" bindtap="onSelectEmoji" data-emoji="{{item}}">{{item}}</text>
+          </block>
+        </view>
+        <input class="rename-input" value="{{renameIcon}}" bindinput="onRenameIconInput" placeholder="emoji" maxlength="2" />
+      </block>
+      <input class="rename-input name-input" value="{{renameName}}" bindinput="onRenameNameInput" placeholder="分类名称" />
+    </view>
+    <view class="modal-footer">
+      <button class="modal-btn cancel" bindtap="hideModals">取消</button>
+      <button class="modal-btn confirm" bindtap="confirmRename">确定</button>
+    </view>
+  </view>
+</view>
+
+<!-- ====== 删除确认弹窗 ====== -->
+<view class="modal-mask" wx:if="{{showDelete}}" catchtap="hideModals">
+  <view class="modal" catchtap="stopBubble">
+    <view class="modal-title">删除「{{deleteTarget.name}}」</view>
+    <view class="modal-body">
+      <block wx:if="{{deleteRecordCount > 0}}">
+        <view class="delete-hint">该分类下有 <text class="count">{{deleteRecordCount}}</text> 条记账记录。</view>
+        <view class="merge-options">
+          <view class="merge-opt primary" bindtap="confirmDeleteWithMerge" data-merge-id="{{deleteMergeOptions[0].id}}">
+            🔀 {{deleteMergeOptions[0].label}}
+          </view>
+          <block wx:for="{{deleteMergeOptions}}" wx:key="id" wx:if="{{index > 0}}">
+            <view class="merge-opt" bindtap="confirmDeleteWithMerge" data-merge-id="{{item.id}}">
+              🔀 {{item.label}}
+            </view>
+          </block>
+        </view>
+      </block>
+      <block wx:else>
+        <view class="delete-hint">确定删除此分类？此操作不可撤销。</view>
+      </block>
+    </view>
+    <view class="modal-footer">
+      <button class="modal-btn cancel" bindtap="hideModals">取消</button>
+      <button class="modal-btn danger" bindtap="confirmDeleteDirect" wx:if="{{deleteRecordCount === 0}}">删除</button>
+    </view>
+  </view>
+</view>
+
+<!-- ====== 添加大类弹窗 ====== -->
+<view class="modal-mask" wx:if="{{showAddBig}}" catchtap="hideModals">
+  <view class="modal" catchtap="stopBubble">
+    <view class="modal-title">添加大类</view>
+    <view class="modal-body">
+      <view class="emoji-picker">
+        <block wx:for="{{['🍜','🚗','🛒','🏠','📱','👶','💄','👗','🎮','🏋','✈️','🐱','💊','🎁','📚','➕','💰','🏆','🏦','📈','💼','🧧','📦','📌','🎵','☕','🎂','🏥','📝','💻']}}" wx:key="*this">
+          <text class="emoji-opt {{newBigIcon === item ? 'selected' : ''}}" bindtap="onAddBigIconInput" data-value="{{item}}">{{item}}</text>
+        </block>
+      </view>
+      <input class="rename-input" value="{{newBigIcon}}" bindinput="onAddBigIconInput" placeholder="emoji" maxlength="2" />
+      <input class="rename-input name-input" value="{{newBigName}}" bindinput="onAddBigNameInput" placeholder="大类名称" />
+    </view>
+    <view class="modal-footer">
+      <button class="modal-btn cancel" bindtap="hideModals">取消</button>
+      <button class="modal-btn confirm" bindtap="confirmAddBig">确定</button>
+    </view>
+  </view>
+</view>
+
+<!-- ====== 添加小类弹窗 ====== -->
+<view class="modal-mask" wx:if="{{showAddChild}}" catchtap="hideModals">
+  <view class="modal" catchtap="stopBubble">
+    <view class="modal-title">添加小类到「{{addChildParentName}}」</view>
+    <view class="modal-body">
+      <input class="rename-input name-input" value="{{newChildName}}" bindinput="onAddChildNameInput" placeholder="小类名称" />
+    </view>
+    <view class="modal-footer">
+      <button class="modal-btn cancel" bindtap="hideModals">取消</button>
+      <button class="modal-btn confirm" bindtap="confirmAddChild">确定</button>
+    </view>
+  </view>
+</view>

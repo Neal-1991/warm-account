@@ -82,11 +82,39 @@ Page({
         parentId: e.detail.parentId,
         isTest: config.isTest
       }
-    }).then(() => {
-      this.loadCategories()
+    }).then(res => {
+      if (res.result?.success) {
+        this.loadCategories()
+      } else {
+        wx.showToast({ title: res.result?.error || '添加失败', icon: 'none' })
+      }
     }).catch(err => {
       console.error('onAddChild error:', err)
       wx.showToast({ title: '添加分类失败', icon: 'none' })
+    })
+  },
+
+  onAddBig(e) {
+    const app = getApp()
+    wx.cloud.callFunction({
+      name: 'category',
+      data: {
+        action: 'addBig',
+        bookId: app.globalData.bookId,
+        name: e.detail.name,
+        icon: e.detail.icon,
+        type: e.detail.type,
+        isTest: config.isTest
+      }
+    }).then(res => {
+      if (res.result?.success) {
+        this.loadCategories()
+      } else {
+        wx.showToast({ title: res.result?.error || '添加失败', icon: 'none' })
+      }
+    }).catch(err => {
+      console.error('onAddBig error:', err)
+      wx.showToast({ title: '添加大类失败', icon: 'none' })
     })
   },
 

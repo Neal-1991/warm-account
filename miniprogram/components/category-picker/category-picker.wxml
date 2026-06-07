@@ -5,6 +5,7 @@
       <text class="manage" bindtap="onManage">管理</text>
     </view>
 
+    <!-- 大类网格 -->
     <view class="big-categories">
       <view
         wx:for="{{bigCategories}}"
@@ -16,9 +17,22 @@
         <text class="icon">{{item.icon}}</text>
         <text class="name">{{item.name}}</text>
       </view>
+      <view class="big-cat-item add-big" bindtap="onAddBigEntry">
+        <text class="icon add-icon">+</text>
+        <text class="name">添加</text>
+      </view>
     </view>
 
+    <!-- 小类列表 -->
     <view class="child-categories">
+      <!-- 大类入口：记在「XXX」下 -->
+      <view
+        class="child-item big-entry {{selectedIsBig ? 'active' : ''}}"
+        bindtap="selectBigOnly"
+      >
+        <text>记在「{{bigCategories[0] && bigCategories[0]._id === selectedBigId ? bigCategories[0].name : ''}}」下</text>
+        <text class="big-entry-hint">不选小类</text>
+      </view>
       <block wx:for="{{childCategories}}" wx:key="_id">
         <view
           class="child-item {{selectedChildId === item._id ? 'active' : ''}}"
@@ -31,9 +45,19 @@
       </block>
     </view>
 
+    <!-- 添加小类 -->
     <view class="add-child" wx:if="{{showAddChild}}">
-      <input class="add-input" placeholder="输入新分类名称" bindinput="onAddInput" value="{{newChildName}}" />
+      <input class="add-input" placeholder="输入新小类名称" bindinput="onAddChildInput" value="{{newChildName}}" />
       <button class="add-btn" bindtap="confirmAddChild">添加</button>
+    </view>
+
+    <!-- 添加大类 -->
+    <view class="add-big-form" wx:if="{{showAddBig}}">
+      <view class="add-big-fields">
+        <input class="icon-input" placeholder="📌" bindinput="onAddBigIconInput" value="{{newBigIcon}}" maxlength="2" />
+        <input class="name-input" placeholder="输入新大类名称" bindinput="onAddBigNameInput" value="{{newBigName}}" />
+        <button class="add-btn" bindtap="confirmAddBig">确定</button>
+      </view>
     </view>
 
     <view class="picker-footer">
