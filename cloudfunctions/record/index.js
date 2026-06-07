@@ -55,7 +55,8 @@ exports.main = async (event, context) => {
             date: db.command.gte(startDate).and(db.command.lt(endDate))
           })
           .orderBy('date', 'desc')
-          .limit(500)  // Add reasonable cap
+          .orderBy('createdAt', 'desc')
+          .limit(500)
           .get()
         return { success: true, records: records.data }
       }
