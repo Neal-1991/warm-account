@@ -131,11 +131,81 @@ exports.getCollectionName = getCollectionName
 exports.updateSystemPresets = async (event) => {
   const collectionName = (name) => getCollectionName(event, name)
   const col = collectionName('categories')
+  const batchStart = Number.isInteger(event.batchStart) ? event.batchStart : 0
+  const batchSize = Number.isInteger(event.batchSize) && event.batchSize > 0 ? event.batchSize : null
 
   const allPresets = [
     ...EXPENSE_CATEGORIES.map(c => ({ ...c, type: 'expense' })),
     ...INCOME_CATEGORIES.map(c => ({ ...c, type: 'income' }))
   ]
+  const targetPresets = batchSize ? allPresets.slice(batchStart, batchStart + batchSize) : allPresets
+
+  const upsertPreset = async (preset) => {
+    const existing = await db.collection(col)
+      .where({ bookId: null, parentId: null, name: preset.name, type: preset.type })
+      .limit(1)
+      .get()
+
+    let parentId
+    let createdParent = false
+    if (existing.data.length > 0) {
+      parentId = existing.data[0]._id
+      await db.collection(col).doc(parentId).update({
+        data: { icon: preset.icon, order: preset.order }
+      })
+    } else {
+      const result = await db.collection(col).add({
+        data: {
+          name: preset.name, icon: preset.icon, order: preset.order,
+          type: preset.type, isVisible: true, isSystem: true,
+          parentId: null, bookId: null
+        }
+      })
+      parentId = result._id
+      createdParent = true
+    }
+
+    const childRes = await db.collection(col)
+      .where({ bookId: null, parentId })
+      .limit(100)
+      .get()
+    const existingChildren = new Set(childRes.data.map(child => child.name))
+    const childCreates = preset.children
+      .filter(childName => !existingChildren.has(childName))
+      .map(childName => db.collection(col).add({
+        data: {
+          name: childName, icon: '', order: 0,
+          type: preset.type, isVisible: true, isSystem: true,
+          parentId, bookId: null
+        }
+      }))
+
+    await Promise.all(childCreates)
+    return {
+      updated: createdParent ? 0 : 1,
+      created: createdParent ? 1 : 0,
+      childrenCreated: childCreates.length
+    }
+  }
+
+  if (batchSize) {
+    const batchResults = await Promise.all(targetPresets.map(upsertPreset))
+    const totals = batchResults.reduce((sum, item) => ({
+      updated: sum.updated + item.updated,
+      created: sum.created + item.created,
+      childrenCreated: sum.childrenCreated + item.childrenCreated
+    }), { updated: 0, created: 0, childrenCreated: 0 })
+
+    return {
+      success: true,
+      ...totals,
+      batchStart,
+      batchSize,
+      processed: targetPresets.length,
+      done: batchStart + batchSize >= allPresets.length,
+      total: allPresets.length
+    }
+  }
 
   const getAllSystemPresets = async () => {
     const result = []
@@ -171,7 +241,7 @@ exports.updateSystemPresets = async (event) => {
 
   let updated = 0, created = 0, childrenCreated = 0
 
-  const parentResults = await Promise.all(allPresets.map(async (preset) => {
+  const parentResults = await Promise.all(targetPresets.map(async (preset) => {
     const key = `${preset.type}:${preset.name}`
     const existing = bigByKey.get(key)
 
@@ -211,5 +281,15 @@ exports.updateSystemPresets = async (event) => {
 
   await Promise.all(childCreates)
 
-  return { success: true, updated, created, childrenCreated, total: allPresets.length }
+  return {
+    success: true,
+    updated,
+    created,
+    childrenCreated,
+    batchStart,
+    batchSize: batchSize || allPresets.length,
+    processed: targetPresets.length,
+    done: !batchSize || batchStart + batchSize >= allPresets.length,
+    total: allPresets.length
+  }
 }
