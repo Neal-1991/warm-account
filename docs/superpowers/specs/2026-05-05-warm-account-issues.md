@@ -65,6 +65,19 @@
 | 34 | 2026-05-28 | 昵称更新后账本名称未同步 | mine.js 传递 bookId；login 云函数 updateProfile 检测所有者后同步更新账本名 |
 | 35 | 2026-06-04 | 审核拒绝：一访问小程序就要求登录 | 改为游客模式：入口改为首页，未登录可浏览 Tab 和空状态，操作时按需引导登录（app.json / index.js / statistics.js / mine.js / login.js 共 7 个文件） |
 | 36 | 2026-06-04 | 退出登录后我的页仍显示头像和昵称 | logout() 清除 userInfo（globalData + Storage）；重新登录后云函数从 members 集合恢复 |
+| 37 | 2026-06-07 | 分类选择器切换大类后「记在XX下」名称为空 | category-picker 新增 selectedBigName 字段，initCategories/selectBig 时动态更新 |
+| 38 | 2026-06-07 | 分类选择器滚动穿透到下层页面 | picker-mask 添加 catchtouchmove="preventTouchMove" |
+| 39 | 2026-06-07 | 清空测试数据后预设分类只显示 4 个 | login 云函数新增 ensureCategories：已有账本自动 migrate/init-database，新账本自动创建预设分类，前端移除手动 init-database 调用 |
+| 40 | 2026-06-07 | init-database 新增 updateSystemPresets action | 增量更新 bookId=null 系统预设（同名原地更新保留 _id，新大类追加），生产部署前执行确保 migrate 复制正确分类 |
+| 41 | 2026-06-07 | 分类选择器内容无法滚动到确定按钮 | picker-content 改为 scroll-view 组件 + catchtouchmove="preventTouchMove" 仅遮罩层阻止穿透 |
+| 42 | 2026-06-07 | 管理页修改分类后记账页不刷新 | add.js 新增 onShow() 重新加载分类，picker 组件 observer 自动刷新 |
+| 43 | 2026-06-07 | book/join 分类合并按 parentId 匹配失败 | per-book 模型下 A/B 大类 _id 不同，改为按大类名称+小类名称匹配；新增大类记账记录重映射、parentId 重映射、自定义大类迁移 |
+| 44 | 2026-06-09 | 云函数信任前端 openId/bookId 导致越权风险 | record/book/category/login.getMembers 统一使用 cloud.getWXContext().OPENID 做身份来源，并按账本成员/所有者校验访问权限 |
+| 45 | 2026-06-09 | 删除大类未检查子类记录导致孤儿分类引用 | category/deleteBig 删除前统计大类本身和所有子类记录，存在记录时阻止删除并返回 recordCount |
+| 46 | 2026-06-09 | 删除小类预检查错用 record/list 导致归并弹窗不可用 | record 云函数新增 countByCategory；category-manage 删除小类前改用精确计数接口 |
+| 47 | 2026-06-09 | 记一笔切换收入/支出保留旧分类 | add.js 切换类型时清空 selectedCategory、关闭 picker、禁用提交，强制重新选择当前类型分类 |
+| 48 | 2026-06-09 | 登录页使用已弃用 getUserInfo 授权入口 | login.wxml 移除 open-type="getUserInfo" / bindgetuserinfo；login.js 改为普通点击登录并使用云端资料或默认资料 |
+| 49 | 2026-06-09 | clear-test-data 未清理成员头像云存储文件 | 清理云存储阶段同时收集 records.images 和 members.avatarUrl 中的 cloud file ID，去重后分批删除 |
 
 ---
 
@@ -72,15 +85,14 @@
 
 | # | 优先级 | 问题描述 | 原因 | 解决方案 |
 |---|---|---|---|---|
-| 1 | 中 | record 云函数 update/delete 无所有权验证 | 未校验当前用户是否为记录创建者或账本管理员 | 云函数中校验 createdBy === openId 或 book.ownerId === openId |
-| 2 | 中 | login 云函数 getMembers 未经验证 | 任何人可传入任意 memberIds 批量查询用户信息 | 限制仅返回与调用者同账本的成员信息 |
-| 3 | 低 | utils/cloud.js 封装的 callFunction 未被前端使用 | 各页面直接调用 wx.cloud.callFunction | 统一改用 cloud.callFunction 以复用错误处理 |
-| 4 | 低 | isTest 硬编码于 config.js | const isTest = true，上线前需手动修改 | 改为环境感知（如读取云开发环境变量） |
-| 5 | 低 | 记录列表无分页 | .limit(500) 硬限制，活跃账本可能丢失早期记录 | 添加基于游标的滚动分页 |
-| 6 | 低 | 登录页使用已弃用 API | open-type="getUserInfo" 在新版微信不再弹出授权窗口 | 改用 chooseAvatar + 新版登录方式 |
-| 7 | 高 | 冷启动登录态丢失 | TC-014 | 小程序被微信回收后重新打开，显示为未登录状态，但"我的"页仍显示昵称 | 静置 30 分钟后重新打开小程序 | 正常显示已登录状态 | 显示未登录，但昵称可见 |
-| 8 | 中 | 同日期记录排序不稳定 | TC-035 | 同一天多条记录显示顺序与录入顺序不一致 | 同一天录入多条记录后查看首页 | 按录入时间倒序排列 | 随机排列 |
-| 9 | 低 | 图片存储无环境区分 | — | 测试环境上传的图片和正式环境共用同一云存储路径 | 在测试环境上传图片 | 图片有环境标签 | 无区分 |
+| 1 | 低 | utils/cloud.js 封装的 callFunction 未被前端使用 | 各页面直接调用 wx.cloud.callFunction | 统一改用 cloud.callFunction 以复用错误处理 |
+| 2 | 低 | isTest 硬编码于 config.js | const isTest = true，上线前需手动修改 | 改为环境感知（如读取云开发环境变量） |
+| 3 | 低 | 记录列表无分页 | .limit(500) 硬限制，活跃账本可能丢失早期记录 | 添加基于游标的滚动分页 |
+| 4 | 高 | 冷启动登录态丢失 | 小程序被微信回收后重新打开，显示为未登录状态，但"我的"页仍显示昵称 | 按 TC-014 复测并统一登录态恢复逻辑 |
+| 5 | 中 | 同日期记录排序不稳定 | 同一天多条记录显示顺序与录入顺序不一致 | 按 TC-035 复测并确保按录入时间倒序排列 |
+| 6 | 低 | 图片存储无环境区分 | 测试环境上传的图片和正式环境共用同一云存储路径 | 上传路径增加 test/prod 环境前缀 |
+| 7 | 中 | 删除有记录小类时归并提示不准确 | 当前小类删除只支持归并到父大类或同父小类，提示文案容易让用户误以为可迁移到任意分类 | 下版优化删除/迁移交互，明确可选范围或新增跨分类迁移能力 |
+| 8 | 高 | 清除测试数据后首次登录容易超时，第二次登录成功 | 首次登录会创建账本、初始化/迁移分类、写 members，链路较长；清库后冷启动更容易触发云函数/前端超时 | 下版拆分初始化流程或增加前端重试/进度提示，优化 login/ensureCategories 性能 |
 
 ---
 

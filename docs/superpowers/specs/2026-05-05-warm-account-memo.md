@@ -890,3 +890,318 @@ setUserInfo(userInfo) {
 - 前端：`category-picker` 组件（js/wxml/wxss）、`add.js/wxml`、`app.json`
 - 新增：`pages/category-manage/`（4个文件）
 - 文档：设计文档、本记录、问题追踪表、测试用例
+
+---
+
+## 十四、分类系统重构测试 Bug 修复（2026-06-07）
+
+### Bug A：分类选择器大类名称显示为空
+
+**问题：** 点击记一笔，选择第二个及之后的大类时，「记在「」下」括号中为空，只有第一个大类能正常显示名称。
+
+**根因：** `category-picker.wxml:33` 硬编码 `bigCategories[0].name`，表达式 `bigCategories[0]._id === selectedBigId` 在选中其他大类时为 false。
+
+**修复：**
+- `category-picker.js` — data 新增 `selectedBigName` 字段
+- `initCategories()` — 初始化时设为第一个大类的名称
+- `selectBig()` — 切换大类时动态更新 `selectedBigName`
+- `category-picker.wxml` — 改为 `{{selectedBigName}}`
+
+### Bug B：清空测试数据后预设大类只显示 4 个
+
+**问题：** 清空 categories_test 后重新登录，记一笔页面支出大类只显示 4 个（预期 16 个）。
+
+**根因（两层）：**
+1. `category/list` 新查询条件为 `{ bookId }`，旧系统预设 `bookId: null` 查不到
+2. 旧 `login` 云函数在登录时创建 per-book 分类副本，新版 `login` 不再创建，改为前端 `login.js` 对新用户（`isNew`）调用 `init-database`。但存量账本 `isNew: false`，`init-database` 从未被调用
+
+**修复（login 云函数彻底改造）：**
+- `login` 新增 `ensureCategories()` 函数，登录时自动检测并处理：
+  1. 已有 per-book 大类 → 跳过
+  2. 尝试 `migrate`（复制 bookId=null 预设 → per-book，remap 记录 categoryId）
+  3. 回退 `init-database`（全新创建 16+7 预设）
+- **新账本**：await 等待分类创建完毕再返回
+- **存量账本**：await 等待迁移/初始化完毕再返回
+- `login.js` 前端移除 `isNew` 时手动调用 `init-database` 的代码
+
+### Bug C：分类选择器滚动穿透
+
+**问题：** 分类选择器弹窗打开后，上下滑动会滚动下层页面而非弹窗内容。
+
+**根因：** 弹窗遮罩层未阻止触摸滚动事件传递。
+
+**修复：**
+- `category-picker.wxml` — `picker-mask` 添加 `catchtouchmove="preventTouchMove"`
+- `category-picker.js` — 新增 `preventTouchMove()` 空方法
+
+### init-database 新增 updateSystemPresets
+
+**用途：** 生产部署前，增量更新 `bookId: null` 系统预设为最新 16+7 版本。
+
+**策略：**
+- 同名大类 → 原地更新 icon/order（保留 `_id`，确保 migrate 能正确 remap 旧记录）
+- 新大类 → 追加创建
+- 缺失子类 → 补充创建
+
+**调用方式：** `init-database` 云函数 `action=updateSystemPresets`（不需要 bookId）
+
+### 涉及文件
+
+| 文件 | 改动 |
+|------|------|
+| `cloudfunctions/login/index.js` | 新增 `ensureCategories()`，登录时自动初始化/迁移分类 |
+| `cloudfunctions/init-database/index.js` | 新增 `updateSystemPresets` action + action 分发 |
+| `miniprogram/pages/login/login.js` | 移除手动 `init-database` 调用 |
+| `miniprogram/components/category-picker/category-picker.js` | 新增 `selectedBigName`、`preventTouchMove` |
+| `miniprogram/components/category-picker/category-picker.wxml` | Bug A/C 修复 |
+
+### 超时优化
+
+**问题：** `init-database` 串行创建 83 条分类文档（23 大类 + 60 子类），每次登录可能超时（默认 3s）。
+
+**修复：**
+- `init-database/index.js` — 分类创建改为 2 轮并行（`Promise.all`）：创建所有大类 → 创建所有子类，总耗时 ~400ms（原 ~8s）
+- 新增 `config.json` 文件为 3 个云函数设置超时：
+  - `login/config.json` — 20s（内部分别调用 category/migrate 和 init-database）
+  - `category/config.json` — 20s（migrate 需要分批更新记录 categoryId）
+  - `init-database/config.json` — 15s（配合并行化后仍有充裕余量）
+
+**数据安全分析：**
+- 并行化后分类创建为原子操作（全部成功或全部失败），不会出现"只创建了部分大类"的中间态
+- migrate 有幂等检查（per-book `existingBig`），超时后下次登录可继续
+- 各云函数 `.catch()` 保证登录不受分类初始化失败影响
+
+---
+
+## 十五、生产环境部署 & 数据迁移清单（2026-06-07）
+
+> 2026-06-09 补充：发布前需同时部署最新 `record`、`category`、`book`、`login`、`clear-test-data` 云函数；生产前端需将 `miniprogram/utils/config.js` 的 `isTest` 改为 `false`。
+
+### 部署前（测试环境验证通过后执行）
+
+**第一步：更新系统预设（bookId=null）**
+
+在微信开发者工具控制台执行，**只执行一次，不可跳过**：
+
+```js
+wx.cloud.callFunction({
+  name: 'init-database',
+  data: { action: 'updateSystemPresets', isTest: false }
+})
+```
+
+作用：将 `categories_prod` 中 `bookId: null` 的旧预设原地更新为 16+7 新版。
+- 同名大类原地更新 icon/order，**保留 `_id`**（确保 migrate 能正确 remap 旧记录 categoryId）
+- 新大类（通讯/育儿/美容护肤/服饰/运动健身/旅行/宠物/奖金/红包礼金）追加创建
+- 缺失子类补充创建
+- 幂等，重复执行无副作用
+
+**第二步：上传云函数（按顺序）**
+
+| 顺序 | 云函数 | 包含改动 |
+|------|--------|----------|
+| 1 | `category` | addBig/rename/deleteChild/deleteBig/migrate（含 config.json 超时 20s） |
+| 2 | `init-database` | updateSystemPresets + 并行创建分类（含 config.json 超时 15s） |
+| 3 | `login` | ensureCategories 自动初始化/迁移（含 config.json 超时 20s） |
+
+**第三步：上传前端**
+
+微信开发者工具「上传」→ 提交审核。
+
+### 用户侧自动迁移流程
+
+部署后存量用户首次登录时，`login` 云函数自动执行：
+
+```
+用户登录
+  → ensureCategories 检测：per-book 无大类
+  → 调用 category/migrate：
+      1. 复制 bookId=null 系统预设 → 写入 bookId=该账本（idMap: 旧_id → 新_id）
+      2. 已有小类 parentId → remap 到新大类 _id
+      3. 已有记录 categoryId → 按 idMap remap 到新分类 _id
+  → 完成（幂等，下次登录秒过）
+```
+
+新用户登录 → `init-database` 并行创建 23 大类 + 60 子类（~0.5s）。
+
+### 回滚预案
+
+| 问题 | 处理 |
+|------|------|
+| migrate 超时（大量记录） | 幂等可重试，再次登录自动续传；部分 remap 不损坏数据 |
+| 分类显示异常 | 重新执行 `action=updateSystemPresets` 同步预设 |
+| 需回滚云函数 | 云开发控制台可回滚到上一个版本；旧 login 不含 ensureCategories 不影响功能 |
+| 需回滚前端 | 重新上传旧版本即可；前端仅额外显示新功能入口，不影响基础记账 |
+
+### 关键注意事项
+
+- **不要删除 `categories_prod` 中的 `bookId: null` 文档** — 它们是 migrate 的源数据。删了会导致存量用户记录变为"未分类"
+- `updateSystemPresets` 是**原地更新**，不会改变已有 `_id`，不影响指向旧分类的记录
+- 存量生产用户的历史账本无需人工逐条迁移；用户首次登录生产版时，`login.ensureCategories()` 会检测该账本是否已有 per-book 大类，没有则自动调用 `category/migrate`。
+- 如果希望发布前主动迁移某个生产用户，可在该用户登录态下调用 `category/migrate` 且传 `isTest:false`；该 action 幂等，已迁移账本会返回 `already migrated`。
+
+---
+
+## 十六、测试反馈补充修复（2026-06-07）
+
+### 分类选择器无法滚动到确定按钮
+
+**问题（第二次迭代）：** 第一次修复（`catchtouchmove` 在遮罩层）反而阻止了弹窗内部的滚动，因为 `catchtouchmove` 在微信小程序中会阻止默认滚动行为。
+
+**根因：** `catchtouchmove` 事件同时阻止传播和默认行为。遮罩上的 `catchtouchmove` 阻止了弹窗内容区的滚动。
+
+**修复：**
+- `picker-content` 从 `<view>` 改为 `<scroll-view scroll-y>`（微信原生组件，内部滚动不通过 touchmove 事件传播）
+- 遮罩保留 `catchtouchmove="preventTouchMove"` 阻止背景穿透
+- CSS `max-height: 70vh` 限制弹窗高度
+
+### 管理页修改分类后记账页不刷新
+
+**问题：** 从分类管理页返回记账页后，打开分类选择器显示的是旧数据，需切换到收入再切回支出才能看到更新。
+
+**根因：** `add.js` 仅在 `onLoad` 加载分类，从管理页返回触发 `onShow`，无重载逻辑。picker 组件的 `visible` observer 重新初始化，但源头 `categories` 属性是旧数据。
+
+**修复：** `add.js` 新增 `onShow()` → `loadCategories()`，确保每次页面显示时分类为最新。picker 组件的 `categories` observer 自动触发 `initCategories()` 刷新 UI。
+
+### 涉及文件
+
+| 文件 | 改动 |
+|------|------|
+| `miniprogram/components/category-picker/category-picker.wxml` | picker-content 改为 scroll-view |
+| `miniprogram/components/category-picker/category-picker.wxss` | 移除 overflow-y:auto，保留 max-height:70vh |
+| `miniprogram/pages/add/add.js` | 新增 onShow() 重新加载分类 |
+- 新用户不受影响，login 直接创建 per-book 分类，不走 migrate 路径
+
+---
+
+## 十七、book/join 分类合并修复（2026-06-07）
+
+### 问题发现
+
+全局代码 review 时发现：`book/join` 中小类合并匹配使用 `parentId:name` 作为 key，但在 per-book 模型中，A 和 B 的大类 `_id` 不同（即使名称相同），导致匹配永远失败。
+
+### 影响场景
+
+- B 加入 A 的家庭时，B 的小类无法正确合并到 A 的对应大类下
+- B 的大类记账记录（categoryId 指向 B 的大类 `_id`）在 join 后指向已删除的分类
+- B 的自定义大类在 join 后丢失
+
+### 修复方案
+
+将 join 流程的合并逻辑从「按 parentId 匹配」改为「按大类名称匹配」：
+
+1. **3a**: 先获取 A 和 B 的大类，构建三个映射表：
+   - `bBigIdToName`: B 大类 `_id` → 名称
+   - `aBigNameToId`: A 大类 `name:type` → `_id`
+   - `aBigIdToName`: A 大类 `_id` → 名称
+
+2. **3b**: 重映射 B 中直接引用大类的记录（大类记账），删除 A 已有的重复大类
+
+3. **3c**: 按 `bigName:childName` 匹配小类（替代原来的 `parentId:name`），同名同父合并，无冲突迁移并重映射 parentId
+
+4. **3d**: 迁移 B 剩余大类（A 中没有的自定义大类）到目标账本
+
+5. **3e**: 批量迁移 B 的历史记录 bookId
+
+### 涉及文件
+
+| 文件 | 改动 |
+|------|------|
+| `cloudfunctions/book/index.js` | 重写 join 的 3a-3e 步骤，从 parentId 匹配改为名称匹配 |
+
+---
+
+## 十八、服务端授权与分类删除保护修复（2026-06-09）
+
+### 问题发现
+
+全量代码 review 后发现三类逻辑风险：
+
+1. 多个云函数仍信任前端传入的 `openId` / `bookId`，攻击者可构造调用参数读取或修改非本人账本数据。
+2. 删除大类时只检查大类自身，未检查其子类下是否存在记账记录，可能导致记录的 `categoryId` 指向已删除分类。
+3. 记一笔页面在“支出/收入”之间切换时保留旧分类，可能提交跨类型分类记录。
+
+### 根因
+
+- 前端状态用于 UI 便利，但云函数中未统一将 `cloud.getWXContext().OPENID` 作为权限来源。
+- 分类删除逻辑只覆盖当前分类节点，未按层级向下统计子类记录。
+- `add.js` 的 `switchType` 只切换 `type` 并重新加载分类，未同步清空 `selectedCategory` 和提交状态。
+
+### 修复方案
+
+- `record` 云函数：新增账本成员校验、分类归属校验、记录所有权校验；`add/list/update/delete/countByCategory/getFileUrl` 均先确认调用者有权访问目标账本；更新/删除仅允许记录创建者或账本所有者执行。
+- `book` 云函数：`get/generateInviteCode/validateInviteCode/join` 改用服务端 OPENID；生成邀请码仅允许账本所有者执行；加入家庭流程不再信任前端 `openId`。
+- `category` 云函数：分类 CRUD 均校验账本成员身份；删除大类前统计大类及全部子类记录，存在记录时阻止删除；删除小类时支持安全归并并校验归并目标。
+- `login.getMembers`：仅返回与调用者同账本的成员资料，并继续通过云函数生成头像临时 URL。
+- `add.js`：切换收入/支出时清空已选分类、关闭分类选择器并禁用提交。
+- `detail.js`：请求图片临时 URL 时传入 `bookId`，配合 `record/getFileUrl` 的服务端成员校验。
+- `category-manage.js`：删除小类前使用 `record/countByCategory` 统计数量，避免错用月份列表接口导致归并弹窗不可用。
+
+### 额外质量红线修复
+
+检查微信小程序质量红线时发现登录页仍保留 `open-type="getUserInfo"` / `bindgetuserinfo`。该入口已不适合新版微信授权流程，本次一并改为普通 `bindtap` 登录：登录只负责通过云函数获取服务端 OPENID 并创建/读取账本，昵称头像仍由“我的”页编辑资料流程维护。
+
+### 涉及文件
+
+| 文件 | 改动 |
+|------|------|
+| `cloudfunctions/record/index.js` | 统一服务端身份校验，新增 `countByCategory`，限制记录与图片访问权限 |
+| `cloudfunctions/book/index.js` | 邀请码、账本查询、加入家庭改用服务端 OPENID 授权 |
+| `cloudfunctions/category/index.js` | 分类 CRUD 加账本成员校验，删除大类前检查大类及子类记录 |
+| `cloudfunctions/login/index.js` | `getMembers` 仅返回同账本成员 |
+| `miniprogram/pages/add/add.js` | 类型切换时清空分类并禁用提交 |
+| `miniprogram/pages/category-manage/category-manage.js` | 删除小类预检查改为 `countByCategory` |
+| `miniprogram/pages/detail/detail.js` | 获取图片临时 URL 时携带 `bookId` |
+| `miniprogram/pages/login/login.wxml` | 移除废弃 `open-type="getUserInfo"` 和 `bindgetuserinfo` |
+| `miniprogram/pages/login/login.js` | 登录流程不再依赖 `e.detail.userInfo`，昵称头像使用云端持久化资料或默认值 |
+
+---
+
+## 十九、clear-test-data 头像云存储清理补充（2026-06-09）
+
+### 问题发现
+
+测试环境清理脚本会清空 `books_test`、`records_test`、`categories_test`、`members_test`，并会删除 `records_test.images` 中引用的记账图片。但头像持久化后，`members_test.avatarUrl` 也可能保存 `cloud://` 文件 ID，原脚本清空 members 文档前没有删除这些头像文件。
+
+### 影响
+
+- 多次测试“编辑头像”后，测试环境云存储会残留 `test/avatars/...` 文件。
+- 数据库看起来已清空，但云存储容量仍会增长。
+
+### 修复方案
+
+- `cloudfunctions/clear-test-data/index.js` 在删除云存储阶段同时读取 `records_test` 和 `members_test`。
+- 收集 `records.images[]` 与 `members.avatarUrl` 中的 `cloud://` 文件 ID。
+- 使用 `Set` 去重后按 50 个一批调用 `cloud.deleteFile()`。
+- 之后再清空 `books_test`、`records_test`、`categories_test`、`members_test`。
+
+### 待操作
+
+重新上传云函数 `clear-test-data` 后再执行清理脚本：
+
+```js
+wx.cloud.callFunction({
+  name: 'clear-test-data'
+}).then(res => console.log('清空结果:', res))
+```
+
+---
+
+## 二十、真机回归反馈记录（2026-06-09）
+
+### 已验证通过
+
+- 删除有记录的小类：重新上传 `record/category` 后，归并流程可用，归并后记录不再变成“未分类”。
+- 删除子类下有记录的大类：重新上传 `category` 后，删除会被阻止，大类、子类和记录均保留。
+
+### 暂缓到下个版本的问题
+
+1. **小类删除归并提示不准确**
+   - 当前逻辑只支持将小类记录归并到父大类或同父其他小类。
+   - 真机提示容易让用户理解为“可以把已有记录迁移到任意其他分类”，但当前能力边界更窄。
+   - 下版处理方向：优化文案，或新增跨大类/跨类型受控迁移能力。
+
+2. **清除测试数据后首次登录超时，第二次登录成功**
+   - 清库后首次登录会同时创建 member、创建 book、初始化/迁移分类，链路较长。
+   - 第二次登录成功说明数据最终创建完成，问题偏向首登初始化耗时/前端超时处理。
+   - 下版处理方向：拆分初始化、缩短 login 链路、增加前端重试与更明确的 loading 状态。
