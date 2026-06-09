@@ -137,55 +137,79 @@ exports.updateSystemPresets = async (event) => {
     ...INCOME_CATEGORIES.map(c => ({ ...c, type: 'income' }))
   ]
 
-  let updated = 0, created = 0
+  const getAllSystemPresets = async () => {
+    const result = []
+    const pageSize = 100
+    let skip = 0
+    while (true) {
+      const res = await db.collection(col)
+        .where({ bookId: null, isSystem: true })
+        .skip(skip)
+        .limit(pageSize)
+        .get()
+      result.push(...res.data)
+      if (res.data.length < pageSize) break
+      skip += pageSize
+    }
+    return result
+  }
 
-  for (const preset of allPresets) {
-    const existing = await db.collection(col)
-      .where({ bookId: null, parentId: null, name: preset.name, type: preset.type })
-      .limit(1)
-      .get()
+  const existingPresets = await getAllSystemPresets()
+  const bigByKey = new Map()
+  const childrenByParent = new Map()
 
-    if (existing.data.length > 0) {
-      await db.collection(col).doc(existing.data[0]._id).update({
+  existingPresets.forEach(cat => {
+    if (cat.parentId === null) {
+      bigByKey.set(`${cat.type}:${cat.name}`, cat)
+      return
+    }
+    if (!childrenByParent.has(cat.parentId)) {
+      childrenByParent.set(cat.parentId, new Set())
+    }
+    childrenByParent.get(cat.parentId).add(cat.name)
+  })
+
+  let updated = 0, created = 0, childrenCreated = 0
+
+  const parentResults = await Promise.all(allPresets.map(async (preset) => {
+    const key = `${preset.type}:${preset.name}`
+    const existing = bigByKey.get(key)
+
+    if (existing) {
+      await db.collection(col).doc(existing._id).update({
         data: { icon: preset.icon, order: preset.order }
       })
       updated++
-
-      for (const childName of preset.children) {
-        const childExist = await db.collection(col)
-          .where({ bookId: null, parentId: existing.data[0]._id, name: childName })
-          .limit(1)
-          .get()
-        if (childExist.data.length === 0) {
-          await db.collection(col).add({
-            data: {
-              name: childName, icon: '', order: 0,
-              type: preset.type, isVisible: true, isSystem: true,
-              parentId: existing.data[0]._id, bookId: null
-            }
-          })
-        }
-      }
-    } else {
-      const { _id: parentId } = await db.collection(col).add({
-        data: {
-          name: preset.name, icon: preset.icon, order: preset.order,
-          type: preset.type, isVisible: true, isSystem: true,
-          parentId: null, bookId: null
-        }
-      })
-      created++
-      for (const childName of preset.children) {
-        await db.collection(col).add({
-          data: {
-            name: childName, icon: '', order: 0,
-            type: preset.type, isVisible: true, isSystem: true,
-            parentId, bookId: null
-          }
-        })
-      }
+      return { preset, parentId: existing._id, existingChildren: childrenByParent.get(existing._id) || new Set() }
     }
-  }
 
-  return { success: true, updated, created, total: allPresets.length }
+    const { _id: parentId } = await db.collection(col).add({
+      data: {
+        name: preset.name, icon: preset.icon, order: preset.order,
+        type: preset.type, isVisible: true, isSystem: true,
+        parentId: null, bookId: null
+      }
+    })
+    created++
+    return { preset, parentId, existingChildren: new Set() }
+  }))
+
+  const childCreates = []
+  parentResults.forEach(({ preset, parentId, existingChildren }) => {
+    preset.children.forEach(childName => {
+      if (existingChildren.has(childName)) return
+      childCreates.push(db.collection(col).add({
+        data: {
+          name: childName, icon: '', order: 0,
+          type: preset.type, isVisible: true, isSystem: true,
+          parentId, bookId: null
+        }
+      }))
+      childrenCreated++
+    })
+  })
+
+  await Promise.all(childCreates)
+
+  return { success: true, updated, created, childrenCreated, total: allPresets.length }
 }
