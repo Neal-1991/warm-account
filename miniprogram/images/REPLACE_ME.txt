@@ -1,0 +1,2 @@
+IMPORTANT: Replace these placeholders with actual designed images before production.
+See README.md for required images and design guidelines.

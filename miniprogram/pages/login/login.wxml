@@ -1,0 +1,29 @@
+<!-- miniprogram/pages/login/login.wxml -->
+<view class="container">
+  <view class="logo-section">
+    <image class="logo" src="/images/logo.png" mode="aspectFit" />
+    <text class="app-name">暖账</text>
+    <text class="slogan">家庭协作记账</text>
+  </view>
+
+  <view class="agreement-section">
+    <text class="agreement-title">在使用前，请阅读并同意以下协议</text>
+    <view class="agreement-links">
+      <text class="link" bindtap="openAgreement">《用户协议》</text>
+      <text class="separator">和</text>
+      <text class="link" bindtap="openPrivacy">《隐私政策》</text>
+    </view>
+    <view class="checkbox-row">
+      <checkbox-group bindchange="onAgreementChange">
+        <label class="checkbox-label">
+          <checkbox value="agreed" color="#FF6B00"/>
+          <text class="checkbox-text">我已阅读并同意以上协议</text>
+        </label>
+      </checkbox-group>
+    </view>
+  </view>
+
+  <button class="login-btn" type="primary" bindtap="onLogin" disabled="{{loading || !agreed}}">
+    微信一键登录
+  </button>
+</view>

@@ -1,0 +1,17 @@
+<view class="record-card">
+  <view class="icon">{{icon}}</view>
+  <view class="info">
+    <view class="category">
+      {{categoryName}}
+      <text wx:if="{{hasImages}}" class="image-indicator">📷</text>
+    </view>
+    <view class="remark" wx:if="{{remark}}">{{remark}}</view>
+  </view>
+  <view class="amount-section">
+    <text class="amount {{type}}">{{type === 'expense' ? '-' : '+'}}¥{{amount}}</text>
+  </view>
+  <view class="meta">
+    <text class="date">{{dateStr}}</text>
+    <text class="creator">{{createdByName}}</text>
+  </view>
+</view>

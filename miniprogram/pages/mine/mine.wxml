@@ -1,0 +1,57 @@
+<view class="container">
+  <view class="profile-section">
+    <view class="avatar-section">
+      <image class="avatar" src="{{userInfo.avatarUrl || '/images/default-avatar.png'}}" />
+      <view wx:if="{{isLoggedIn}}" class="edit-btn" bindtap="onShowEditModal">✏️</view>
+    </view>
+    <text class="nickname">{{userInfo.nickName || '未登录'}}</text>
+  </view>
+
+  <view class="menu-list">
+    <view class="menu-item" bindtap="goToFamily">
+      <text class="icon">👨‍👩‍👧</text>
+      <text class="label">家庭</text>
+      <text class="arrow">›</text>
+    </view>
+    <view class="menu-item" bindtap="goToAbout">
+      <text class="icon">ℹ️</text>
+      <text class="label">关于</text>
+      <text class="arrow">›</text>
+    </view>
+  </view>
+
+  <button wx:if="{{isLoggedIn}}" class="logout-btn" bindtap="onLogout">退出登录</button>
+  <button wx:else class="login-btn" bindtap="goToLogin">微信一键登录</button>
+
+  <!-- 编辑弹窗 -->
+  <view wx:if="{{showEditModal}}" class="edit-modal">
+    <view class="edit-modal-content">
+      <view class="modal-header">
+        <view class="modal-title">编辑个人信息</view>
+        <view class="modal-close" bindtap="onHideEditModal">✕</view>
+      </view>
+
+      <view class="modal-body">
+        <!-- 头像 - 可点击选择微信头像/拍照/相册 -->
+        <button class="avatar-btn" open-type="chooseAvatar" bindchooseavatar="onChooseWechatAvatar">
+          <image class="avatar-preview" src="{{userInfo.avatarUrl || '/images/default-avatar.png'}}" mode="aspectFill" />
+          <view class="avatar-overlay">
+            <text class="avatar-overlay-icon">📷</text>
+            <text class="avatar-overlay-text">更换头像</text>
+          </view>
+        </button>
+
+        <!-- 昵称输入 -->
+        <view class="nickname-section">
+          <input class="nickname-input" type="nickname" value="{{userInfo.nickName || ''}}" placeholder="请输入昵称" bindinput="onNicknameInput" bindblur="onNicknameBlur" />
+          <view class="nickname-hint">点击输入框可使用微信昵称</view>
+        </view>
+      </view>
+
+      <view class="modal-actions">
+        <button class="btn-cancel" bindtap="onHideEditModal">取消</button>
+        <button class="btn-save" bindtap="onSaveProfile">保存</button>
+      </view>
+    </view>
+  </view>
+</view>

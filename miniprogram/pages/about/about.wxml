@@ -1,0 +1,19 @@
+<view class="container">
+  <view class="logo-section">
+    <image class="logo" src="/images/logo.png" mode="aspectFit" />
+    <text class="app-name">暖账</text>
+  </view>
+
+  <view class="version">版本 1.0.0</view>
+
+  <view class="links">
+    <view class="link-item" bindtap="openTerms">
+      <text class="label">用户协议</text>
+      <text class="arrow">›</text>
+    </view>
+    <view class="link-item" bindtap="openPrivacy">
+      <text class="label">隐私政策</text>
+      <text class="arrow">›</text>
+    </view>
+  </view>
+</view>

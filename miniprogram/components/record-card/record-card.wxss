@@ -1,0 +1,69 @@
+.record-card {
+  display: flex;
+  align-items: center;
+  background: #FFFFFF;
+  margin: 15rpx 30rpx;
+  padding: 25rpx;
+  border-radius: 12rpx;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.05);
+}
+
+.icon {
+  font-size: 48rpx;
+  margin-right: 20rpx;
+}
+
+.info {
+  flex: 1;
+}
+
+.category {
+  font-size: 30rpx;
+  color: #333;
+  font-weight: 500;
+}
+
+.image-indicator {
+  font-size: 24rpx;
+  margin-left: 8rpx;
+}
+
+.remark {
+  font-size: 24rpx;
+  color: #999;
+  margin-top: 8rpx;
+}
+
+.amount-section {
+  margin-right: 20rpx;
+}
+
+.amount {
+  font-size: 32rpx;
+  font-weight: bold;
+}
+
+.amount.expense {
+  color: #FF6B00;
+}
+
+.amount.income {
+  color: #4CAF50;
+}
+
+.meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.date {
+  font-size: 22rpx;
+  color: #999;
+}
+
+.creator {
+  font-size: 22rpx;
+  color: #CCC;
+  margin-top: 8rpx;
+}

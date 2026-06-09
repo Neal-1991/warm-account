@@ -1,0 +1,9 @@
+{
+  "name": "clear-test-data",
+  "version": "1.0.0",
+  "description": "清空测试环境集合数据",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

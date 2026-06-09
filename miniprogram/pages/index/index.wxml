@@ -1,0 +1,37 @@
+<view class="container">
+  <view class="header">
+    <month-selector month="{{currentMonth}}" bindchange="onMonthChange" />
+  </view>
+
+  <summary-card
+    month="{{currentMonthDisplay}}"
+    expenseAmount="{{summary.expense}}"
+    incomeAmount="{{summary.income}}"
+    balanceAmount="{{summary.balance}}"
+  />
+
+  <view class="record-list">
+    <block wx:for="{{records}}" wx:key="_id">
+      <view bindtap="onRecordTap" data-record-id="{{item._id}}">
+        <record-card
+          icon="{{item.icon}}"
+          categoryName="{{item.categoryName}}"
+          remark="{{item.remark}}"
+          type="{{item.type}}"
+          amount="{{item.amountDisplay}}"
+          dateStr="{{item.dateStr}}"
+          createdByName="{{item.createdByName}}"
+          hasImages="{{item.hasImages}}"
+        />
+      </view>
+    </block>
+    <view wx:if="{{records.length === 0}}" class="empty">
+      <text>本月暂无账目</text>
+      <text class="empty-hint">点击右下角按钮记一笔</text>
+    </view>
+  </view>
+
+  <view class="add-btn" bindtap="goToAdd">
+    <text>+</text>
+  </view>
+</view>

@@ -1,0 +1,67 @@
+<view class="picker-mask" bindtap="onClose" catchtouchmove="preventTouchMove" wx:if="{{visible}}">
+  <scroll-view scroll-y class="picker-content" catchtap="stopBubble">
+    <view class="picker-header">
+      <text class="title">选择分类</text>
+      <text class="manage" bindtap="onManage">管理</text>
+    </view>
+
+    <!-- 大类网格 -->
+    <view class="big-categories">
+      <view
+        wx:for="{{bigCategories}}"
+        wx:key="_id"
+        class="big-cat-item {{selectedBigId === item._id ? 'active' : ''}}"
+        bindtap="selectBig"
+        data-id="{{item._id}}"
+      >
+        <text class="icon">{{item.icon}}</text>
+        <text class="name">{{item.name}}</text>
+      </view>
+      <view class="big-cat-item add-big" bindtap="onAddBigEntry">
+        <text class="icon add-icon">+</text>
+        <text class="name">添加</text>
+      </view>
+    </view>
+
+    <!-- 小类列表 -->
+    <view class="child-categories">
+      <!-- 大类入口：记在「XXX」下 -->
+      <view
+        class="child-item big-entry {{selectedIsBig ? 'active' : ''}}"
+        bindtap="selectBigOnly"
+      >
+        <text>记在「{{selectedBigName}}」下</text>
+        <text class="big-entry-hint">不选小类</text>
+      </view>
+      <block wx:for="{{childCategories}}" wx:key="_id">
+        <view
+          class="child-item {{selectedChildId === item._id ? 'active' : ''}}"
+          bindtap="selectChild"
+          data-id="{{item._id}}"
+          data-name="{{item.name}}"
+        >
+          {{item.name}}
+        </view>
+      </block>
+    </view>
+
+    <!-- 添加小类 -->
+    <view class="add-child" wx:if="{{showAddChild}}">
+      <input class="add-input" placeholder="输入新小类名称" bindinput="onAddChildInput" value="{{newChildName}}" />
+      <button class="add-btn" bindtap="confirmAddChild">添加</button>
+    </view>
+
+    <!-- 添加大类 -->
+    <view class="add-big-form" wx:if="{{showAddBig}}">
+      <view class="add-big-fields">
+        <input class="icon-input" placeholder="📌" bindinput="onAddBigIconInput" value="{{newBigIcon}}" maxlength="2" />
+        <input class="name-input" placeholder="输入新大类名称" bindinput="onAddBigNameInput" value="{{newBigName}}" />
+        <button class="add-btn" bindtap="confirmAddBig">确定</button>
+      </view>
+    </view>
+
+    <view class="picker-footer">
+      <button class="confirm-btn" bindtap="onConfirm">确定</button>
+    </view>
+  </scroll-view>
+</view>

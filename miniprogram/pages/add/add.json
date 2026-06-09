@@ -1,0 +1,5 @@
+{
+  "usingComponents": {
+    "category-picker": "/components/category-picker/category-picker"
+  }
+}

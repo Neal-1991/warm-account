@@ -1,0 +1,59 @@
+<view class="container">
+  <view class="family-info" wx:if="{{bookName}}">
+    <text class="family-name">{{bookName}}</text>
+    <view class="invite-section" wx:if="{{isAdmin}}">
+      <view class="invite-code-hint" wx:if="{{inviteCode}}">
+        <text class="invite-code-label">邀请码：</text>
+        <text class="invite-code-value">{{inviteCode}}</text>
+        <text class="invite-code-tip">有效期 1 小时</text>
+      </view>
+      <button class="invite-btn" open-type="share">邀请成员</button>
+    </view>
+  </view>
+
+  <view class="member-section">
+    <text class="section-title">家庭成员</text>
+    <view class="member-list">
+      <view class="member-item" wx:for="{{members}}" wx:key="openId">
+        <image class="member-avatar" src="{{item.avatarUrl || '/images/default-avatar.png'}}" />
+        <view class="member-info">
+          <text class="member-name">{{item.nickName}}</text>
+          <text class="member-role">{{item.role === 'admin' ? '管理员' : '成员'}}</text>
+        </view>
+        <text
+          class="remove-btn"
+          wx:if="{{item.openId !== currentOpenId && isAdmin}}"
+          bindtap="removeMember"
+          data-openid="{{item.openId}}"
+        >移除</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 确认加入弹窗 -->
+  <view class="dialog-mask" wx:if="{{dialogType === 'confirm'}}">
+    <view class="dialog-card">
+      <view class="dialog-body">
+        <text class="dialog-title">{{dialogBookName}}</text>
+        <text class="dialog-desc">加入后，你的历史账目将合并到此账本</text>
+      </view>
+      <view class="dialog-actions">
+        <button class="dialog-btn-cancel" bindtap="onDismissJoin">暂不加入</button>
+        <button class="dialog-btn-confirm" bindtap="onConfirmJoin">加入</button>
+      </view>
+    </view>
+  </view>
+
+  <!-- 提示弹窗 -->
+  <view class="dialog-mask" wx:if="{{dialogType === 'tip'}}">
+    <view class="dialog-card">
+      <view class="dialog-body">
+        <text class="dialog-title">{{dialogTitle}}</text>
+        <text class="dialog-desc" wx:if="{{dialogContent}}">{{dialogContent}}</text>
+      </view>
+      <view class="dialog-actions dialog-actions-single">
+        <button class="dialog-btn-confirm" bindtap="onDismissTip">知道了</button>
+      </view>
+    </view>
+  </view>
+</view>

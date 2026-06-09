@@ -1,0 +1,23 @@
+<view class="container">
+  <view class="header">
+    <month-selector month="{{currentMonth}}" bindchange="onMonthChange" />
+  </view>
+
+  <view class="chart-container">
+    <ec-canvas id="pie-chart" canvas-id="pie-chart" ec="{{ecChart}}"></ec-canvas>
+  </view>
+
+  <view class="legend">
+    <block wx:for="{{legend}}" wx:key="name">
+      <view class="legend-item">
+        <view class="color-dot" style="background: {{item.color}};"></view>
+        <text class="name">{{item.name}}</text>
+        <text class="amount">¥{{item.amount}}</text>
+        <text class="percent">{{item.percent}}%</text>
+      </view>
+    </block>
+    <view wx:if="{{legend.length === 0}}" class="empty">
+      <text>本月暂无支出数据</text>
+    </view>
+  </view>
+</view>
