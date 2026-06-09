@@ -26,6 +26,11 @@ Page({
     this.loadCategories()
   },
 
+  onShow() {
+    // 从分类管理页返回后刷新分类
+    this.loadCategories()
+  },
+
   loadCategories() {
     const app = getApp()
     const { type } = this.data
@@ -45,9 +50,17 @@ Page({
   },
 
   switchType(e) {
-    this.setData({ type: e.currentTarget.dataset.type })
+    const nextType = e.currentTarget.dataset.type
+    if (nextType === this.data.type) {
+      return
+    }
+    this.setData({
+      type: nextType,
+      selectedCategory: { id: null, name: '', icon: '' },
+      showCategoryPicker: false,
+      canSubmit: false
+    })
     this.loadCategories()  // 切换类型时重新加载对应分类
-    this.checkCanSubmit()
   },
 
   onAmountInput(e) {

@@ -24,31 +24,42 @@ async function getAllData(collection) {
 exports.main = async (event, context) => {
   const results = []
 
+  const addCloudFileId = (fileIds, value) => {
+    if (typeof value === 'string' && value.startsWith('cloud://')) {
+      fileIds.add(value)
+    }
+  }
+
   // 1. 清理云存储图片
   try {
     const recordsCol = db.collection(`records${SUFFIX}`)
+    const membersCol = db.collection(`members${SUFFIX}`)
     const countResult = await recordsCol.count()
     console.log(`[clear-test-data] records count: ${countResult.total}`)
 
     const allRecords = await getAllData(recordsCol)
-    const fileIds = []
+    const allMembers = await getAllData(membersCol)
+    const fileIds = new Set()
     for (const record of allRecords) {
       if (record.images && record.images.length > 0) {
         for (const img of record.images) {
-          if (typeof img === 'string' && img.startsWith('cloud://')) {
-            fileIds.push(img)
-          }
+          addCloudFileId(fileIds, img)
         }
       }
     }
-    console.log(`[clear-test-data] found ${fileIds.length} cloud file IDs:`, fileIds)
+    for (const member of allMembers) {
+      addCloudFileId(fileIds, member.avatarUrl)
+    }
 
-    if (fileIds.length > 0) {
+    const fileList = Array.from(fileIds)
+    console.log(`[clear-test-data] found ${fileList.length} cloud file IDs:`, fileList)
+
+    if (fileList.length > 0) {
       const BATCH_SIZE = 50
       let totalDeleted = 0
       let totalFailed = 0
-      for (let i = 0; i < fileIds.length; i += BATCH_SIZE) {
-        const batch = fileIds.slice(i, i + BATCH_SIZE)
+      for (let i = 0; i < fileList.length; i += BATCH_SIZE) {
+        const batch = fileList.slice(i, i + BATCH_SIZE)
         const res = await cloud.deleteFile({ fileList: batch })
         // 检查每个文件的删除状态
         if (res && res.fileList) {

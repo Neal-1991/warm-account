@@ -129,10 +129,9 @@ Page({
     // 检查记录数
     wx.cloud.callFunction({
       name: 'record',
-      data: { action: 'list', bookId, data: { categoryId: cat._id }, isTest: config.isTest }
+      data: { action: 'countByCategory', bookId, data: { categoryId: cat._id }, isTest: config.isTest }
     }).then(res => {
-      const records = res.result?.records || []
-      const count = records.length
+      const count = res.result?.count || 0
       if (count === 0) {
         // 无记录，直接确认
         this.setData({

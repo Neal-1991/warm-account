@@ -10,6 +10,7 @@ Component({
     bigCategories: [],
     childCategories: [],
     selectedBigId: null,
+    selectedBigName: '',
     selectedChildId: null,
     selectedIsBig: false,
     showAddChild: false,
@@ -49,9 +50,11 @@ Component({
       })
       // 默认选中第一个大类
       const firstId = big.length > 0 ? big[0]._id : null
+      const firstName = big.length > 0 ? big[0].name : ''
       this.setData({
         bigCategories: big,
         selectedBigId: firstId,
+        selectedBigName: firstName,
         selectedChildId: null,
         selectedIsBig: false,
         showAddChild: false,
@@ -82,8 +85,10 @@ Component({
     },
     selectBig(e) {
       const bigId = e.currentTarget.dataset.id
+      const big = this.data.bigCategories.find(b => b._id === bigId)
       this.setData({
         selectedBigId: bigId,
+        selectedBigName: big ? big.name : '',
         selectedChildId: null,
         selectedIsBig: false,
         showAddChild: false,
@@ -178,6 +183,7 @@ Component({
     onClose() {
       this.triggerEvent('close')
     },
+    preventTouchMove() {},
     stopBubble() {}
   }
 })

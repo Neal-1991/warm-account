@@ -23,7 +23,7 @@
     </view>
   </view>
 
-  <button class="login-btn" type="primary" bindgetuserinfo="onLogin" open-type="getUserInfo" disabled="{{loading || !agreed}}">
+  <button class="login-btn" type="primary" bindtap="onLogin" disabled="{{loading || !agreed}}">
     微信一键登录
   </button>
 </view>

@@ -41,8 +41,13 @@ const INCOME_CATEGORIES = [
 ]
 
 exports.main = async (event, context) => {
-  const { bookId } = event
+  const { bookId, action } = event
   const collectionName = (name) => getCollectionName(event, name)
+
+  // action=updateSystemPresets: 更新 bookId=null 系统预设（生产部署前执行）
+  if (action === 'updateSystemPresets') {
+    return exports.updateSystemPresets(event)
+  }
 
   if (!bookId) {
     return { success: false, error: 'bookId is required for init-database' }
@@ -66,42 +71,121 @@ exports.main = async (event, context) => {
       ...INCOME_CATEGORIES.map(c => ({ ...c, type: 'income' }))
     ]
 
-    let totalCount = 0
-    for (const cat of allCats) {
-      // 创建大类
-      const { _id: parentId } = await db.collection(col).add({
-        data: {
-          name: cat.name,
-          icon: cat.icon,
-          order: cat.order,
-          type: cat.type,
-          isVisible: true,
-          isSystem: true,
-          parentId: null,
-          bookId
-        }
-      })
-      // 创建子类
-      for (const childName of cat.children) {
-        await db.collection(col).add({
+    // 并行创建所有大类（互不依赖）
+    const bigResults = await Promise.all(
+      allCats.map(cat =>
+        db.collection(col).add({
           data: {
-            name: childName,
-            icon: '',
-            order: 0,
+            name: cat.name,
+            icon: cat.icon,
+            order: cat.order,
             type: cat.type,
             isVisible: true,
             isSystem: true,
-            parentId,
+            parentId: null,
             bookId
           }
         })
-      }
-      totalCount += 1 + cat.children.length
-    }
+      )
+    )
 
+    // 并行创建所有子类
+    let childCount = 0
+    const childPromises = []
+    allCats.forEach((cat, i) => {
+      const parentId = bigResults[i]._id
+      cat.children.forEach(childName => {
+        childPromises.push(
+          db.collection(col).add({
+            data: {
+              name: childName,
+              icon: '',
+              order: 0,
+              type: cat.type,
+              isVisible: true,
+              isSystem: true,
+              parentId,
+              bookId
+            }
+          })
+        )
+        childCount++
+      })
+    })
+    await Promise.all(childPromises)
+
+    const totalCount = allCats.length + childCount
     return { success: true, categoryCount: totalCount }
   } catch (err) {
     console.error('init-database error:', err)
     return { success: false, error: err.message }
   }
+}
+
+// 导出供 login 云函数复用
+exports.EXPENSE_CATEGORIES = EXPENSE_CATEGORIES
+exports.INCOME_CATEGORIES = INCOME_CATEGORIES
+exports.getCollectionName = getCollectionName
+
+// 可通过 action=updateSystemPresets 单独调用，用于生产部署前更新 bookId=null 预设
+exports.updateSystemPresets = async (event) => {
+  const collectionName = (name) => getCollectionName(event, name)
+  const col = collectionName('categories')
+
+  const allPresets = [
+    ...EXPENSE_CATEGORIES.map(c => ({ ...c, type: 'expense' })),
+    ...INCOME_CATEGORIES.map(c => ({ ...c, type: 'income' }))
+  ]
+
+  let updated = 0, created = 0
+
+  for (const preset of allPresets) {
+    const existing = await db.collection(col)
+      .where({ bookId: null, parentId: null, name: preset.name, type: preset.type })
+      .limit(1)
+      .get()
+
+    if (existing.data.length > 0) {
+      await db.collection(col).doc(existing.data[0]._id).update({
+        data: { icon: preset.icon, order: preset.order }
+      })
+      updated++
+
+      for (const childName of preset.children) {
+        const childExist = await db.collection(col)
+          .where({ bookId: null, parentId: existing.data[0]._id, name: childName })
+          .limit(1)
+          .get()
+        if (childExist.data.length === 0) {
+          await db.collection(col).add({
+            data: {
+              name: childName, icon: '', order: 0,
+              type: preset.type, isVisible: true, isSystem: true,
+              parentId: existing.data[0]._id, bookId: null
+            }
+          })
+        }
+      }
+    } else {
+      const { _id: parentId } = await db.collection(col).add({
+        data: {
+          name: preset.name, icon: preset.icon, order: preset.order,
+          type: preset.type, isVisible: true, isSystem: true,
+          parentId: null, bookId: null
+        }
+      })
+      created++
+      for (const childName of preset.children) {
+        await db.collection(col).add({
+          data: {
+            name: childName, icon: '', order: 0,
+            type: preset.type, isVisible: true, isSystem: true,
+            parentId, bookId: null
+          }
+        })
+      }
+    }
+  }
+
+  return { success: true, updated, created, total: allPresets.length }
 }

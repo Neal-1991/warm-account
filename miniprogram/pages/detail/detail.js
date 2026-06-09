@@ -37,7 +37,12 @@ Page({
   loadFileUrls(fileList) {
     wx.cloud.callFunction({
       name: 'record',
-      data: { action: 'getFileUrl', fileList, isTest: config.isTest }
+      data: {
+        action: 'getFileUrl',
+        bookId: this.data.record.bookId,
+        fileList,
+        isTest: config.isTest
+      }
     }).then(res => {
       if (res.result?.success) {
         const urls = res.result.fileList.map(f => f.tempFileURL)

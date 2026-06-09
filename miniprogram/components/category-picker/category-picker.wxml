@@ -1,5 +1,5 @@
-<view class="picker-mask" bindtap="onClose" wx:if="{{visible}}">
-  <view class="picker-content" catchtap="stopBubble">
+<view class="picker-mask" bindtap="onClose" catchtouchmove="preventTouchMove" wx:if="{{visible}}">
+  <scroll-view scroll-y class="picker-content" catchtap="stopBubble">
     <view class="picker-header">
       <text class="title">选择分类</text>
       <text class="manage" bindtap="onManage">管理</text>
@@ -30,7 +30,7 @@
         class="child-item big-entry {{selectedIsBig ? 'active' : ''}}"
         bindtap="selectBigOnly"
       >
-        <text>记在「{{bigCategories[0] && bigCategories[0]._id === selectedBigId ? bigCategories[0].name : ''}}」下</text>
+        <text>记在「{{selectedBigName}}」下</text>
         <text class="big-entry-hint">不选小类</text>
       </view>
       <block wx:for="{{childCategories}}" wx:key="_id">
@@ -63,5 +63,5 @@
     <view class="picker-footer">
       <button class="confirm-btn" bindtap="onConfirm">确定</button>
     </view>
-  </view>
+  </scroll-view>
 </view>

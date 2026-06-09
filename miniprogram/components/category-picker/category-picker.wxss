@@ -12,10 +12,10 @@
 
 .picker-content {
   width: 100%;
+  max-height: 70vh;
   background: #FFFFFF;
   border-radius: 32rpx 32rpx 0 0;
   padding: 30rpx;
-  max-height: 70vh;
 }
 
 .picker-header {

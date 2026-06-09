@@ -22,30 +22,22 @@ Page({
     this.setData({ agreed: e.detail.value.includes('agreed') })
   },
 
-  onLogin(e) {
+  onLogin() {
     // 安全检查：确保用户已勾选协议
     if (!this.data.agreed) {
       wx.showToast({ title: '请先阅读并同意协议', icon: 'none' })
       return
     }
 
-    if (!e.detail.userInfo) {
-      wx.showToast({ title: '需要授权才能登录', icon: 'none' })
-      return
-    }
-
     this.setData({ loading: true })
     wx.showLoading({ title: '登录中...' })
 
-    const { nickName, avatarUrl } = e.detail.userInfo
-
     wx.cloud.init({ env: config.env })
 
-    // 前端只需传递 nickName 和 avatarUrl，openId 由云函数服务端获取
-    // 同时传递 isTest 参数以便云函数选择正确的集合后缀
+    // openId 由云函数服务端获取；昵称头像在“我的”页编辑后持久化。
     wx.cloud.callFunction({
       name: 'login',
-      data: { nickName, avatarUrl, isTest: config.isTest }
+      data: { isTest: config.isTest }
     }).then(res => {
       wx.hideLoading()
       this.setData({ loading: false })
@@ -56,17 +48,10 @@ Page({
         app.setOpenId(res.result.openId)
 
         // 保存用户信息（优先使用云函数返回的持久化资料）
-        const userInfo = res.result.userInfo || { nickName, avatarUrl }
+        const userInfo = res.result.userInfo || { nickName: '微信用户', avatarUrl: '' }
         app.setUserInfo(userInfo)
 
-        if (res.result.isNew) {
-          wx.cloud.callFunction({
-            name: 'init-database',
-            data: { bookId: res.result.bookId, isTest: config.isTest }
-          }).catch(err => {
-            console.error('init-database error:', err)
-          })
-        }
+        // 分类初始化已由 login 云函数内部处理（新账本自动创建，已有账本自动迁移）
 
         // 检查是否有待处理的邀请码（从分享卡片进入）
         const pendingCode = wx.getStorageSync('pendingInviteCode')

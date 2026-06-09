@@ -2,6 +2,7 @@
 const cloud = require('wx-server-sdk')
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const db = cloud.database()
+const _ = db.command
 
 const getCollectionName = (event, name) => {
   const suffix = event.isTest !== undefined ? (event.isTest ? '_test' : '_prod') : '_test'
@@ -11,10 +12,52 @@ const getCollectionName = (event, name) => {
 exports.main = async (event, context) => {
   const { action, bookId, name, parentId, categoryId, type, icon } = event
   const collectionName = (name) => getCollectionName(event, name)
+  const wxContext = cloud.getWXContext()
+  const openId = wxContext.OPENID
+
+  const getBook = async (id) => {
+    if (!id) return null
+    const res = await db.collection(collectionName('books')).doc(id).get()
+    return res.data || null
+  }
+
+  const assertBookMember = async (id) => {
+    const book = await getBook(id)
+    if (!book || (book.ownerId !== openId && !(book.memberIds || []).includes(openId))) {
+      throw new Error('permission denied')
+    }
+    return book
+  }
+
+  const getCategoryInBook = async (id, targetBookId) => {
+    const res = await db.collection(collectionName('categories')).doc(id).get()
+    const cat = res.data
+    if (!cat || cat.bookId !== targetBookId) {
+      throw new Error('permission denied')
+    }
+    return cat
+  }
+
+  const assertMergeTarget = async (sourceCat, mergeTargetId) => {
+    const target = await getCategoryInBook(mergeTargetId, sourceCat.bookId)
+    const isParent = target._id === sourceCat.parentId && target.parentId === null
+    const isSibling = target.parentId === sourceCat.parentId
+    if (!isParent && !isSibling) {
+      throw new Error('invalid merge target')
+    }
+    if (target.type !== sourceCat.type) {
+      throw new Error('invalid merge target')
+    }
+    return target
+  }
 
   try {
     switch (action) {
       case 'list': {
+        if (!bookId) {
+          return { success: false, error: 'bookId is required' }
+        }
+        await assertBookMember(bookId)
         const whereCondition = { bookId }
         if (type) whereCondition.type = type
         const categories = await db.collection(collectionName('categories'))
@@ -23,24 +66,27 @@ exports.main = async (event, context) => {
           .get()
         return { success: true, categories: categories.data }
       }
+
       case 'addBig': {
         if (!name || !bookId) {
           return { success: false, error: 'name and bookId are required' }
         }
+        await assertBookMember(bookId)
         if (!type || !['expense', 'income'].includes(type)) {
           return { success: false, error: 'type must be expense or income' }
         }
-        // 检查同名大类
+
+        const trimmedName = name.trim()
         const existing = await db.collection(collectionName('categories'))
-          .where({ bookId, parentId: null, name, type })
+          .where({ bookId, parentId: null, name: trimmedName, type })
           .get()
         if (existing.data.length > 0) {
           return { success: false, error: '同名大类已存在' }
         }
-        // 创建大类
+
         const { _id } = await db.collection(collectionName('categories')).add({
           data: {
-            name,
+            name: trimmedName,
             icon: icon || '📌',
             order: 0,
             type,
@@ -50,7 +96,7 @@ exports.main = async (event, context) => {
             bookId
           }
         })
-        // 自动创建"其他"子类
+
         await db.collection(collectionName('categories')).add({
           data: {
             name: '其他',
@@ -65,31 +111,31 @@ exports.main = async (event, context) => {
         })
         return { success: true, categoryId: _id }
       }
+
       case 'addChild': {
         if (!name || !parentId || !bookId) {
           return { success: false, error: 'name, parentId and bookId are required' }
         }
-        // 检查同名小类
+        await assertBookMember(bookId)
+        const parent = await getCategoryInBook(parentId, bookId)
+        if (parent.parentId !== null) {
+          return { success: false, error: 'parentId must be a big category' }
+        }
+
+        const trimmedName = name.trim()
         const existing = await db.collection(collectionName('categories'))
-          .where({ bookId, parentId, name })
+          .where({ bookId, parentId, name: trimmedName })
           .get()
         if (existing.data.length > 0) {
           return { success: false, error: '同名小类已存在' }
         }
-        // 获取父分类的type
-        let childType = type
-        if (!childType && parentId) {
-          const parent = await db.collection(collectionName('categories')).doc(parentId).get()
-          if (parent.data) {
-            childType = parent.data.type || 'expense'
-          }
-        }
+
         const { _id } = await db.collection(collectionName('categories')).add({
           data: {
-            name,
+            name: trimmedName,
             icon: '',
             order: 0,
-            type: childType || 'expense',
+            type: parent.type || type || 'expense',
             isVisible: true,
             isSystem: false,
             parentId,
@@ -98,57 +144,61 @@ exports.main = async (event, context) => {
         })
         return { success: true, categoryId: _id }
       }
+
       case 'rename': {
         if (!categoryId || !bookId) {
           return { success: false, error: 'categoryId and bookId are required' }
         }
+        await assertBookMember(bookId)
+        const cat = await getCategoryInBook(categoryId, bookId)
+
         const updateData = {}
         if (name !== undefined && name.trim()) updateData.name = name.trim()
         if (icon !== undefined) updateData.icon = icon
         if (Object.keys(updateData).length === 0) {
           return { success: false, error: 'name or icon is required' }
         }
-        // 仅允许修改自己账本的分类
-        const cat = await db.collection(collectionName('categories')).doc(categoryId).get()
-        if (!cat.data || cat.data.bookId !== bookId) {
-          return { success: false, error: '无权修改此分类' }
-        }
-        // 检查是否与同类同名
+
         if (updateData.name) {
-          const parentId = cat.data.parentId
-          const dup = await db.collection(collectionName('categories'))
-            .where({ bookId, parentId: parentId || null, name: updateData.name })
-            .get()
-          if (dup.data.length > 0 && dup.data[0]._id !== categoryId) {
+          const dupWhere = {
+            bookId,
+            parentId: cat.parentId || null,
+            name: updateData.name,
+            type: cat.type
+          }
+          const dup = await db.collection(collectionName('categories')).where(dupWhere).get()
+          if (dup.data.some(item => item._id !== categoryId)) {
             return { success: false, error: '同名分类已存在' }
           }
         }
+
         await db.collection(collectionName('categories')).doc(categoryId).update({
           data: updateData
         })
         return { success: true }
       }
+
       case 'deleteChild': {
         if (!categoryId || !bookId) {
           return { success: false, error: 'categoryId and bookId are required' }
         }
-        const cat = await db.collection(collectionName('categories')).doc(categoryId).get()
-        if (!cat.data || cat.data.bookId !== bookId) {
-          return { success: false, error: '无权删除此分类' }
+        await assertBookMember(bookId)
+        const cat = await getCategoryInBook(categoryId, bookId)
+        if (cat.parentId === null) {
+          return { success: false, error: 'please use deleteBig for big categories' }
         }
-        if (cat.data.parentId === null) {
-          return { success: false, error: '请使用 deleteBig 删除大类' }
-        }
-        // 统计关联记录数
+
         const { total } = await db.collection(collectionName('records'))
-          .where({ bookId, categoryId }).count()
+          .where({ bookId, categoryId })
+          .count()
+
         if (total > 0) {
           const mergeTargetId = event.mergeTargetId
           if (!mergeTargetId) {
-            return { success: false, error: '有记录引用', recordCount: total }
+            return { success: false, error: 'category has records', recordCount: total }
           }
-          // 归并：将所有记录移到目标分类
-          let updated = 0
+          await assertMergeTarget(cat, mergeTargetId)
+
           const batchSize = 100
           for (let i = 0; i <= total; i += batchSize) {
             const batch = await db.collection(collectionName('records'))
@@ -160,81 +210,102 @@ exports.main = async (event, context) => {
               await db.collection(collectionName('records')).doc(rec._id).update({
                 data: { categoryId: mergeTargetId, updatedAt: db.serverDate() }
               })
-              updated++
             }
           }
         }
+
         await db.collection(collectionName('categories')).doc(categoryId).remove()
         return { success: true, mergedRecords: total }
       }
+
       case 'deleteBig': {
         if (!categoryId || !bookId) {
           return { success: false, error: 'categoryId and bookId are required' }
         }
-        const cat = await db.collection(collectionName('categories')).doc(categoryId).get()
-        if (!cat.data || cat.data.bookId !== bookId) {
-          return { success: false, error: '无权删除此分类' }
+        await assertBookMember(bookId)
+        const cat = await getCategoryInBook(categoryId, bookId)
+        if (cat.isSystem) {
+          return { success: false, error: '系统预设大类不可删除' }
         }
-        if (cat.data.isSystem) {
-          return { success: false, error: '系统预置大类不可删除' }
+        if (cat.parentId !== null) {
+          return { success: false, error: 'please use deleteChild for child categories' }
         }
-        if (cat.data.parentId !== null) {
-          return { success: false, error: '请使用 deleteChild 删除小类' }
-        }
-        // 检查子类
+
         const children = await db.collection(collectionName('categories'))
-          .where({ bookId, parentId: categoryId }).get()
-        // 检查是否有记录直接引用该大类
-        const { total } = await db.collection(collectionName('records'))
-          .where({ bookId, categoryId }).count()
-        if (total > 0) {
-          return { success: false, error: '该大类下有记录，请先将记录迁移', recordCount: total }
+          .where({ bookId, parentId: categoryId })
+          .get()
+        const childIds = children.data.map(child => child._id)
+
+        const directCount = await db.collection(collectionName('records'))
+          .where({ bookId, categoryId })
+          .count()
+        let childCount = { total: 0 }
+        if (childIds.length > 0) {
+          childCount = await db.collection(collectionName('records'))
+            .where({ bookId, categoryId: _.in(childIds) })
+            .count()
         }
-        // 级联删除子类（先删子类再删大类）
+
+        const totalRecords = directCount.total + childCount.total
+        if (totalRecords > 0) {
+          return {
+            success: false,
+            error: '该大类或子类下有记录，请先迁移记录',
+            recordCount: totalRecords
+          }
+        }
+
         for (const child of children.data) {
           await db.collection(collectionName('categories')).doc(child._id).remove()
         }
         await db.collection(collectionName('categories')).doc(categoryId).remove()
         return { success: true, deletedChildren: children.data.length }
       }
+
       case 'hide': {
+        if (!categoryId || !bookId) {
+          return { success: false, error: 'categoryId and bookId are required' }
+        }
+        await assertBookMember(bookId)
+        await getCategoryInBook(categoryId, bookId)
         await db.collection(collectionName('categories')).doc(categoryId).update({
           data: { isVisible: false }
         })
         return { success: true }
       }
+
       case 'migrate': {
-        // 幂等迁移：将共享分类模式转为 per-book 独立副本
-        const { openId } = event
-        if (!openId) {
+        const migrationOpenId = openId || event.openId
+        if (!migrationOpenId) {
           return { success: false, error: 'openId is required for migration' }
         }
-        // 查找用户的所有账本（owner 或 member）
         const ownedBooks = await db.collection(collectionName('books'))
-          .where({ ownerId: openId }).get()
+          .where({ ownerId: migrationOpenId })
+          .get()
         const memberBooks = await db.collection(collectionName('books'))
-          .where(db.command.where({
-            memberIds: db.command.all([openId])
-          })).get()
+          .where({ memberIds: migrationOpenId })
+          .get()
         const allBooks = [...ownedBooks.data, ...memberBooks.data]
         if (allBooks.length === 0) {
           return { success: true, message: 'no book to migrate' }
         }
+
         const results = []
         for (const book of allBooks) {
-          // 检查是否已迁移（账本已有 bookId=该账本的大类）
           const existingBig = await db.collection(collectionName('categories'))
             .where({ bookId: book._id, parentId: null })
-            .limit(1).get()
+            .limit(1)
+            .get()
           if (existingBig.data.length > 0) {
             results.push({ bookId: book._id, status: 'skipped', reason: 'already migrated' })
             continue
           }
-          // 获取所有系统大类（bookId: null）
+
           const systemBigs = await db.collection(collectionName('categories'))
-            .where({ bookId: null, parentId: null }).get()
-          const idMap = {} // oldId -> newId
-          // 复制大类
+            .where({ bookId: null, parentId: null })
+            .get()
+          const idMap = {}
+
           for (const big of systemBigs.data) {
             const { _id } = await db.collection(collectionName('categories')).add({
               data: {
@@ -250,9 +321,10 @@ exports.main = async (event, context) => {
             })
             idMap[big._id] = _id
           }
-          // 更新小类的 parentId
+
           const children = await db.collection(collectionName('categories'))
-            .where({ bookId: book._id, parentId: db.command.neq(null) }).get()
+            .where({ bookId: book._id, parentId: _.neq(null) })
+            .get()
           for (const child of children.data) {
             const newParentId = idMap[child.parentId]
             if (newParentId) {
@@ -261,15 +333,17 @@ exports.main = async (event, context) => {
               })
             }
           }
-          // 更新记录的 categoryId
+
           for (const [oldId, newId] of Object.entries(idMap)) {
             const { total } = await db.collection(collectionName('records'))
-              .where({ bookId: book._id, categoryId: oldId }).count()
+              .where({ bookId: book._id, categoryId: oldId })
+              .count()
             if (total === 0) continue
             for (let i = 0; i <= total; i += 100) {
               const batch = await db.collection(collectionName('records'))
                 .where({ bookId: book._id, categoryId: oldId })
-                .limit(100).get()
+                .limit(100)
+                .get()
               if (batch.data.length === 0) break
               for (const rec of batch.data) {
                 await db.collection(collectionName('records')).doc(rec._id).update({
@@ -282,6 +356,7 @@ exports.main = async (event, context) => {
         }
         return { success: true, results }
       }
+
       default:
         return { success: false, error: 'unknown action' }
     }

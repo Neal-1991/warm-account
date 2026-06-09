@@ -10,10 +10,34 @@ const getCollectionName = (event, name) => {
 }
 
 exports.main = async (event, context) => {
-  const { action, openId, nickName, bookId } = event
+  const { action, nickName, bookId } = event
   const collectionName = (name) => getCollectionName(event, name)
+  const wxContext = cloud.getWXContext()
+  const openId = wxContext.OPENID
+
+  const getBook = async (id) => {
+    if (!id) return null
+    const res = await db.collection(collectionName('books')).doc(id).get()
+    return res.data || null
+  }
+
+  const isBookMember = (book) => {
+    return !!book && (book.ownerId === openId || (book.memberIds || []).includes(openId))
+  }
+
+  const assertBookOwner = async (id) => {
+    const book = await getBook(id)
+    if (!book || book.ownerId !== openId) {
+      throw new Error('permission denied')
+    }
+    return book
+  }
 
   try {
+    if (!openId) {
+      return { success: false, error: 'openId is required' }
+    }
+
     switch (action) {
       case 'create': {
         const { _id } = await db.collection(collectionName('books')).add({
@@ -43,19 +67,21 @@ exports.main = async (event, context) => {
         if (!bookId) {
           return { success: false, error: 'bookId is required' }
         }
+        await assertBookOwner(bookId)
         const code = String(Math.floor(Math.random() * 900000) + 100000)
         await db.collection(collectionName('books')).doc(bookId).update({
           data: {
             inviteCode: code,
             inviteCodeExpire: new Date(Date.now() + 60 * 60 * 1000),
-            inviteCodeUsedBy: null
+            inviteCodeUsedBy: null,
+            updatedAt: db.serverDate()
           }
         })
         return { success: true, code }
       }
 
       case 'validateInviteCode': {
-        const { code, openId } = event
+        const { code } = event
         if (!code || code.length !== 6) {
           return { success: false, error: 'invalid_code', reason: 'not_found' }
         }
@@ -72,7 +98,7 @@ exports.main = async (event, context) => {
         const book = books.data[0]
 
         if (book.inviteCodeUsedBy) {
-          if (openId && (book.memberIds || []).includes(openId)) {
+          if ((book.memberIds || []).includes(openId)) {
             return { success: false, error: 'already_member', reason: 'already_member', bookName: book.name }
           }
           return { success: false, error: 'code_used', reason: 'used' }
@@ -80,7 +106,7 @@ exports.main = async (event, context) => {
 
         if (book.inviteCodeExpire && new Date(book.inviteCodeExpire) < new Date()) {
           await db.collection(collectionName('books')).doc(book._id).update({
-            data: { inviteCode: '', inviteCodeExpire: null }
+            data: { inviteCode: '', inviteCodeExpire: null, updatedAt: db.serverDate() }
           })
           return { success: false, error: 'code_expired', reason: 'expired' }
         }
@@ -95,18 +121,15 @@ exports.main = async (event, context) => {
 
       case 'join': {
         const { code } = event
-        if (!openId) {
-          return { success: false, error: 'openId is required' }
-        }
         if (!code || code.length !== 6) {
           return { success: false, error: '邀请码无效' }
         }
 
-        const col = collectionName('books')
+        const bookCol = collectionName('books')
         const catCol = collectionName('categories')
+        const recCol = collectionName('records')
 
-        // 1. 查找目标账本（邀请码）
-        const targetBooks = await db.collection(col)
+        const targetBooks = await db.collection(bookCol)
           .where({ inviteCode: code })
           .limit(1)
           .get()
@@ -117,31 +140,26 @@ exports.main = async (event, context) => {
 
         const targetBook = targetBooks.data[0]
 
-        // 检查是否已被使用
         if (targetBook.inviteCodeUsedBy) {
           return { success: false, error: '该邀请已被使用' }
         }
 
-        // 检查是否过期
         if (targetBook.inviteCodeExpire && new Date(targetBook.inviteCodeExpire) < new Date()) {
-          await db.collection(col).doc(targetBook._id).update({
-            data: { inviteCode: '', inviteCodeExpire: null }
+          await db.collection(bookCol).doc(targetBook._id).update({
+            data: { inviteCode: '', inviteCodeExpire: null, updatedAt: db.serverDate() }
           })
           return { success: false, error: '邀请码已过期' }
         }
 
-        // 不能加入自己的账本
         if (targetBook.ownerId === openId) {
           return { success: false, error: '你已是该账本的管理员' }
         }
 
-        // 检查是否已是该账本成员
         if ((targetBook.memberIds || []).includes(openId)) {
           return { success: false, error: '你已是该账本的成员' }
         }
 
-        // 2. 查找用户当前持有的账本
-        const userBooks = await db.collection(col)
+        const userBooks = await db.collection(bookCol)
           .where(_.or([{ ownerId: openId }, { memberIds: openId }]))
           .get()
 
@@ -152,48 +170,81 @@ exports.main = async (event, context) => {
           return { success: false, error: '你已有其他家庭账本，暂不支持切换' }
         }
 
-        // 3. 迁移分类和记录 + 删除旧账本
-        const recCol = collectionName('records')
-
         if (userBook && userBook._id !== targetBook._id) {
-          // 3a. 智能合并 B 的小类到目标账本
-          const bCategories = await db.collection(catCol)
+          const aBigs = await db.collection(catCol)
+            .where({ bookId: targetBook._id, parentId: null })
+            .get()
+          const bBigs = await db.collection(catCol)
+            .where({ bookId: userBook._id, parentId: null })
+            .get()
+
+          const bBigIdToName = new Map()
+          for (const big of bBigs.data) {
+            bBigIdToName.set(big._id, big.name)
+          }
+
+          const aBigNameToId = new Map()
+          const aBigIdToName = new Map()
+          for (const big of aBigs.data) {
+            aBigNameToId.set(`${big.name}:${big.type}`, big._id)
+            aBigIdToName.set(big._id, big.name)
+          }
+
+          for (const bBig of bBigs.data) {
+            const aBigId = aBigNameToId.get(`${bBig.name}:${bBig.type}`)
+            if (aBigId) {
+              await db.collection(recCol)
+                .where({ bookId: userBook._id, categoryId: bBig._id })
+                .update({ data: { categoryId: aBigId, updatedAt: db.serverDate() } })
+              await db.collection(catCol).doc(bBig._id).remove()
+            }
+          }
+
+          const bChildren = await db.collection(catCol)
             .where({ bookId: userBook._id, parentId: _.neq(null) })
             .get()
 
-          if (bCategories.data.length > 0) {
-            const aCategories = await db.collection(catCol)
+          if (bChildren.data.length > 0) {
+            const aChildren = await db.collection(catCol)
               .where({ bookId: targetBook._id, parentId: _.neq(null) })
               .get()
 
-            // 构建 A 的小类查找表: "parentId:name" -> category doc
             const aCatMap = new Map()
-            for (const cat of aCategories.data) {
-              aCatMap.set(`${cat.parentId}:${cat.name}`, cat)
+            for (const cat of aChildren.data) {
+              const bigName = aBigIdToName.get(cat.parentId) || ''
+              aCatMap.set(`${bigName}:${cat.name}`, cat)
             }
 
-            for (const bCat of bCategories.data) {
-              const key = `${bCat.parentId}:${bCat.name}`
+            for (const bCat of bChildren.data) {
+              const bBigName = bBigIdToName.get(bCat.parentId) || ''
+              const key = `${bBigName}:${bCat.name}`
               const aCat = aCatMap.get(key)
 
               if (aCat) {
-                // 同名同父 → 合并：B 的记录重映射到 A 的分类
                 await db.collection(recCol)
-                  .where({ categoryId: bCat._id })
-                  .update({
-                    data: { categoryId: aCat._id }
-                  })
+                  .where({ bookId: userBook._id, categoryId: bCat._id })
+                  .update({ data: { categoryId: aCat._id, updatedAt: db.serverDate() } })
                 await db.collection(catCol).doc(bCat._id).remove()
               } else {
-                // 无冲突 → 迁移小类到目标账本
-                await db.collection(catCol).doc(bCat._id).update({
-                  data: { bookId: targetBook._id }
-                })
+                const aBigId = aBigNameToId.get(`${bBigName}:${bCat.type}`)
+                const updateData = { bookId: targetBook._id }
+                if (aBigId) {
+                  updateData.parentId = aBigId
+                }
+                await db.collection(catCol).doc(bCat._id).update({ data: updateData })
               }
             }
           }
 
-          // 3b. 迁移 B 的历史记录到目标账本
+          const remainingBigs = await db.collection(catCol)
+            .where({ bookId: userBook._id, parentId: null })
+            .get()
+          for (const big of remainingBigs.data) {
+            await db.collection(catCol).doc(big._id).update({
+              data: { bookId: targetBook._id }
+            })
+          }
+
           await db.collection(recCol)
             .where({ bookId: userBook._id })
             .update({
@@ -201,22 +252,17 @@ exports.main = async (event, context) => {
             })
         }
 
-        // 4. 先将 B 加入目标账本（在删除旧账本之前，避免中间状态数据丢失）
-        const memberIds = targetBook.memberIds || []
-        memberIds.push(openId)
-
-        await db.collection(col).doc(targetBook._id).update({
+        await db.collection(bookCol).doc(targetBook._id).update({
           data: {
-            memberIds,
+            memberIds: _.addToSet(openId),
             inviteCodeExpire: null,
             inviteCodeUsedBy: openId,
             updatedAt: db.serverDate()
           }
         })
 
-        // 5. 最后删除旧账本（只有加入新账本成功后才会执行）
         if (userBook && userBook._id !== targetBook._id) {
-          await db.collection(col).doc(userBook._id).remove()
+          await db.collection(bookCol).doc(userBook._id).remove()
         }
 
         return { success: true, bookId: targetBook._id }

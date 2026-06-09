@@ -12,6 +12,57 @@ const getSuffix = (event) => {
   return '_test'
 }
 
+// 确保账本有分类：新账本初始化预设，已有账本自动迁移
+const ensureCategories = async (bookId, openId, isTest) => {
+  const suffix = isTest !== undefined ? (isTest ? '_test' : '_prod') : '_test'
+  const col = (name) => `${name}${suffix}`
+  const db = cloud.database()
+
+  try {
+    // 检查是否已有 per-book 大类
+    const existing = await db.collection(col('categories'))
+      .where({ bookId, parentId: null })
+      .limit(1)
+      .get()
+    if (existing.data.length > 0) {
+      return // 已初始化，跳过
+    }
+  } catch (e) {
+    console.error('ensureCategories check existing error:', e)
+    return
+  }
+
+  // 尝试迁移（存量用户：复制 bookId=null 系统预设 → per-book，remap 记录）
+  try {
+    const migrateRes = await cloud.callFunction({
+      name: 'category',
+      data: { action: 'migrate', openId, isTest }
+    })
+    if (migrateRes.result?.success) {
+      const migrated = migrateRes.result.results?.find(
+        r => r.bookId === bookId && r.status === 'migrated' && r.categoryCount > 0
+      )
+      if (migrated) {
+        console.log(`ensureCategories: migrated book ${bookId}`)
+        return
+      }
+    }
+  } catch (e) {
+    console.error('ensureCategories migrate error:', e)
+  }
+
+  // 回退：创建全新预设分类（新用户或 bookId=null 预设不存在的场景）
+  try {
+    await cloud.callFunction({
+      name: 'init-database',
+      data: { bookId, isTest }
+    })
+    console.log(`ensureCategories: initialized book ${bookId}`)
+  } catch (e) {
+    console.error('ensureCategories init-database error:', e)
+  }
+}
+
 exports.main = async (event, context) => {
   try {
     const { nickName, avatarUrl, action } = event
@@ -79,11 +130,28 @@ exports.main = async (event, context) => {
     // batch query member profiles (called from family page)
     if (action === 'getMembers') {
       const { memberIds } = event
-      if (!memberIds || memberIds.length === 0) {
+      if (!Array.isArray(memberIds) || memberIds.length === 0) {
         return { success: true, members: [] }
       }
+
+      const books = await db.collection(collectionName('books'))
+        .where(_.or([{ ownerId: openId }, { memberIds: openId }]))
+        .get()
+      const allowedMemberIds = new Set()
+      books.data.forEach(book => {
+        ;(book.memberIds || []).forEach(id => allowedMemberIds.add(id))
+        if (book.ownerId) {
+          allowedMemberIds.add(book.ownerId)
+        }
+      })
+
+      const safeMemberIds = memberIds.filter(id => allowedMemberIds.has(id))
+      if (safeMemberIds.length === 0) {
+        return { success: true, members: [] }
+      }
+
       const members = await db.collection(collectionName('members'))
-        .where({ openId: _.in(memberIds) })
+        .where({ openId: _.in(safeMemberIds) })
         .get()
 
       // 将 cloud:// 头像路径转为临时 URL（跨用户访问需要云函数管理员权限）
@@ -143,7 +211,10 @@ exports.main = async (event, context) => {
       .get()
 
     if (books.data.length > 0) {
-      return { success: true, bookId: books.data[0]._id, isNew: false, openId, userInfo }
+      const bookId = books.data[0]._id
+      await ensureCategories(bookId, openId, event.isTest).catch(e =>
+        console.error('ensureCategories failed:', e))
+      return { success: true, bookId, isNew: false, openId, userInfo }
     }
 
     const { _id } = await db.collection(collectionName('books')).add({
@@ -158,6 +229,9 @@ exports.main = async (event, context) => {
       }
     })
 
+    // 等待分类创建完成再返回（新用户必须有分类才能记账）
+    await ensureCategories(_id, openId, event.isTest).catch(e =>
+      console.error('ensureCategories failed:', e))
     return { success: true, bookId: _id, isNew: true, openId, userInfo }
   } catch (err) {
     console.error('login cloud function error:', err)
