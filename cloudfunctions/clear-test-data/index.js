@@ -3,10 +3,8 @@ const cloud = require('wx-server-sdk')
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const db = cloud.database()
 
-// 测试环境集合后缀
-const SUFFIX = '_test'
-
-const COLLECTIONS = ['books', 'records', 'categories', 'members']
+const COLLECTIONS = ['books', 'records', 'categories', 'members', 'budgets']
+const PRODUCTION_CONFIRMATION = 'RESET_WARM_ACCOUNT_PRODUCTION'
 
 // 获取集合全部数据（支持超过 100 条的分页）
 async function getAllData(collection) {
@@ -22,6 +20,24 @@ async function getAllData(collection) {
 }
 
 exports.main = async (event, context) => {
+  const isProduction = event.target === 'production'
+  const suffix = isProduction ? '_prod' : '_test'
+  const label = isProduction ? '生产' : '测试'
+
+  if (isProduction) {
+    const openId = cloud.getWXContext().OPENID
+    const allowedOpenId = process.env.PRODUCTION_RESET_OPENID
+    if (!allowedOpenId) {
+      return { success: false, error: 'PRODUCTION_RESET_OPENID is not configured' }
+    }
+    if (openId !== allowedOpenId) {
+      return { success: false, error: 'permission denied' }
+    }
+    if (event.confirmation !== PRODUCTION_CONFIRMATION) {
+      return { success: false, error: 'production reset confirmation mismatch' }
+    }
+  }
+
   const results = []
 
   const addCloudFileId = (fileIds, value) => {
@@ -32,10 +48,10 @@ exports.main = async (event, context) => {
 
   // 1. 清理云存储图片
   try {
-    const recordsCol = db.collection(`records${SUFFIX}`)
-    const membersCol = db.collection(`members${SUFFIX}`)
+    const recordsCol = db.collection(`records${suffix}`)
+    const membersCol = db.collection(`members${suffix}`)
     const countResult = await recordsCol.count()
-    console.log(`[clear-test-data] records count: ${countResult.total}`)
+    console.log(`[clear-test-data] ${label} records count: ${countResult.total}`)
 
     const allRecords = await getAllData(recordsCol)
     const allMembers = await getAllData(membersCol)
@@ -99,7 +115,7 @@ exports.main = async (event, context) => {
 
   // 2. 清理数据库集合
   for (const colName of COLLECTIONS) {
-    const fullName = `${colName}${SUFFIX}`
+    const fullName = `${colName}${suffix}`
     try {
       const col = db.collection(fullName)
       const allData = await getAllData(col)
@@ -126,7 +142,8 @@ exports.main = async (event, context) => {
   console.log('[clear-test-data] results:', JSON.stringify(results))
   return {
     success: true,
-    message: '测试数据清理完成',
+    target: isProduction ? 'production' : 'test',
+    message: `${label}数据清理完成`,
     results
   }
 }

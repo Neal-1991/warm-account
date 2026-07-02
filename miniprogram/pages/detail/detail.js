@@ -7,7 +7,7 @@ Page({
     canDelete: false
   },
 
-  onLoad(options) {
+  async onLoad(options) {
     const { recordId } = options
     if (!recordId) {
       wx.showToast({ title: '参数错误', icon: 'none' })
@@ -15,6 +15,11 @@ Page({
     }
 
     const app = getApp()
+    const session = await app.ensureSession()
+    if (!session.authenticated) {
+      wx.navigateTo({ url: '/pages/login/login' })
+      return
+    }
     const records = app.globalData._currentRecords || []
     const record = records.find(r => r._id === recordId)
 
@@ -23,7 +28,7 @@ Page({
       return
     }
 
-    const canDelete = record.createdBy === app.globalData.openId
+    const canDelete = record.createdBy === app.getOpenId()
     const images = record.images || []
 
     this.setData({ record, images, canDelete })

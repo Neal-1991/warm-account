@@ -7,7 +7,7 @@
 
   <!-- 分类列表 -->
   <view class="category-list">
-    <block wx:for="{{bigCategories}}" wx:key="_id" wx:if="{{item.type === activeTab}}">
+    <block wx:for="{{visibleBigCategories}}" wx:key="_id">
       <!-- 大类 -->
       <view class="big-section">
         <view class="big-header">
@@ -56,7 +56,7 @@
     <view class="modal-body">
       <block wx:if="{{renameTarget && renameTarget.parentId === null}}">
         <view class="emoji-picker">
-          <block wx:for="{{['🍜','🚗','🛒','🏠','📱','👶','💄','👗','🎮','🏋','✈️','🐱','💊','🎁','📚','➕','💰','🏆','🏦','📈','💼','🧧','📦','📌','🎵','☕','🎂','🏥','📝','💻']}}" wx:key="*this">
+          <block wx:for="{{commonEmojis}}" wx:key="*this">
             <text class="emoji-opt {{renameIcon === item ? 'selected' : ''}}" bindtap="onSelectEmoji" data-emoji="{{item}}">{{item}}</text>
           </block>
         </view>
@@ -106,11 +106,11 @@
     <view class="modal-title">添加大类</view>
     <view class="modal-body">
       <view class="emoji-picker">
-        <block wx:for="{{['🍜','🚗','🛒','🏠','📱','👶','💄','👗','🎮','🏋','✈️','🐱','💊','🎁','📚','➕','💰','🏆','🏦','📈','💼','🧧','📦','📌','🎵','☕','🎂','🏥','📝','💻']}}" wx:key="*this">
-          <text class="emoji-opt {{newBigIcon === item ? 'selected' : ''}}" bindtap="onAddBigIconInput" data-value="{{item}}">{{item}}</text>
+        <block wx:for="{{commonEmojis}}" wx:key="*this">
+          <text class="emoji-opt {{newBigIcon === item ? 'selected' : ''}}" catchtap="onSelectAddBigEmoji" data-index="{{index}}">{{item}}</text>
         </block>
       </view>
-      <input class="rename-input" value="{{newBigIcon}}" bindinput="onAddBigIconInput" placeholder="emoji" maxlength="2" />
+      <input class="rename-input" value="{{newBigIcon}}" bindinput="onAddBigIconInput" placeholder="emoji" maxlength="8" />
       <input class="rename-input name-input" value="{{newBigName}}" bindinput="onAddBigNameInput" placeholder="大类名称" />
     </view>
     <view class="modal-footer">

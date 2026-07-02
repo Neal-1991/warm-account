@@ -20,7 +20,8 @@ module.exports = {
     books: isTest ? 'books_test' : 'books_prod',
     records: isTest ? 'records_test' : 'records_prod',
     categories: isTest ? 'categories_test' : 'categories_prod',
-    members: isTest ? 'members_test' : 'members_prod'
+    members: isTest ? 'members_test' : 'members_prod',
+    budgets: isTest ? 'budgets_test' : 'budgets_prod'
   },
 
   // 当前环境标识

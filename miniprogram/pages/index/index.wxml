@@ -10,21 +10,77 @@
     balanceAmount="{{summary.balance}}"
   />
 
+  <view class="budget-card" bindtap="goToBudget">
+    <view class="budget-header">
+      <text class="budget-title">{{budgetView.isHistorical ? '该月预算' : '本月预算'}}</text>
+      <text wx:if="{{budgetView.configured}}" class="budget-detail">查看详情 ›</text>
+    </view>
+
+    <view wx:if="{{budgetView.configured}}">
+      <view class="budget-main">
+        <text class="budget-remaining">{{budgetView.isOver ? '-' : ''}}¥{{budgetView.remainingAmount}}</text>
+        <text class="budget-unit">{{budgetView.isOver ? '已超支' : (budgetView.isExhausted ? '已用完' : '可用')}}</text>
+        <text class="budget-percent {{budgetView.status}}">{{budgetView.percent}}%</text>
+      </view>
+      <view class="budget-progress">
+        <view
+          class="budget-progress-fill {{budgetView.status}}"
+          style="width: {{budgetView.progressWidth}}%;"
+        ></view>
+      </view>
+      <view class="budget-meta">
+        <text>已花 ¥{{budgetView.usedAmount}}</text>
+        <text>预算 ¥{{budgetView.limitAmount}}</text>
+      </view>
+      <view wx:if="{{budgetView.paceText}}" class="budget-pace">{{budgetView.paceText}}</view>
+    </view>
+
+    <view wx:else class="budget-empty">
+      <view class="budget-empty-icon">🎯</view>
+      <text class="budget-empty-title">
+        {{budgetView.isHistorical ? '该月未设置预算' : (budgetView.canEdit ? '尚未设置预算' : '管理员暂未设置本月预算')}}
+      </text>
+      <text class="budget-empty-note">账目与收支统计仍会正常展示</text>
+      <button
+        wx:if="{{budgetView.canEdit && !budgetView.isHistorical}}"
+        class="budget-set-btn"
+        catchtap="goToBudget"
+      >设置本月预算</button>
+    </view>
+  </view>
+
   <view class="record-list">
-    <block wx:for="{{records}}" wx:key="_id">
-      <view bindtap="onRecordTap" data-record-id="{{item._id}}">
-        <record-card
-          icon="{{item.icon}}"
-          categoryName="{{item.categoryName}}"
-          remark="{{item.remark}}"
-          type="{{item.type}}"
-          amount="{{item.amountDisplay}}"
-          dateStr="{{item.dateStr}}"
-          createdByName="{{item.createdByName}}"
-          hasImages="{{item.hasImages}}"
-        />
+    <block wx:for="{{recordGroups}}" wx:for-item="group" wx:key="dateKey">
+      <view class="day-group">
+        <view class="day-header">
+          <view class="day-title-wrap">
+            <text class="day-title">{{group.title}}</text>
+            <text class="day-subtitle">{{group.subtitle}}</text>
+          </view>
+          <view class="day-total">
+            <text wx:if="{{group.hasIncome}}" class="day-income">收入 ¥{{group.incomeAmount}}</text>
+            <text wx:if="{{group.hasExpense}}" class="day-expense">支出 ¥{{group.expenseAmount}}</text>
+          </view>
+        </view>
+
+        <block wx:for="{{group.records}}" wx:for-item="record" wx:key="_id">
+          <view bindtap="onRecordTap" data-record-id="{{record._id}}">
+            <record-card
+              icon="{{record.icon}}"
+              categoryName="{{record.categoryName}}"
+              remark="{{record.remark}}"
+              type="{{record.type}}"
+              amount="{{record.amountDisplay}}"
+              dateStr="{{record.dateStr}}"
+              createdByName="{{record.createdByName}}"
+              hasImages="{{record.hasImages}}"
+              hideDate="{{true}}"
+            />
+          </view>
+        </block>
       </view>
     </block>
+
     <view wx:if="{{records.length === 0}}" class="empty">
       <text>本月暂无账目</text>
       <text class="empty-hint">点击右下角按钮记一笔</text>

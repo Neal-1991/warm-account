@@ -1,12 +1,18 @@
 const config = require('../../utils/config')
-
-const COMMON_EMOJIS = ['🍜','🚗','🛒','🏠','📱','👶','💄','👗','🎮','🏋','✈️','🐱','💊','🎁','📚','➕','💰','🏆','🏦','📈','💼','🧧','📦','📌','🎵','☕','🎂','🏥','📝','💻']
+const { filterBigCategories } = require('./category-manage-utils')
+const {
+  COMMON_EMOJIS,
+  emojiFromIndex,
+  emojiFromInput
+} = require('../../utils/category-emoji')
 
 Page({
   data: {
     activeTab: 'expense',
     bigCategories: [],
+    visibleBigCategories: [],
     childMap: {},
+    commonEmojis: COMMON_EMOJIS,
     showRename: false,
     renameTarget: null,
     renameName: '',
@@ -32,10 +38,11 @@ Page({
     this.loadCategories()
   },
 
-  loadCategories() {
+  async loadCategories() {
     const app = getApp()
-    const bookId = app.globalData?.bookId || app.getBookId()
-    if (!bookId) return
+    const session = await app.ensureSession()
+    const bookId = session.bookId || app.getBookId()
+    if (!session.authenticated || !bookId) return
 
     wx.cloud.callFunction({
       name: 'category',
@@ -48,7 +55,11 @@ Page({
       bigCategories.forEach(big => {
         childMap[big._id] = cats.filter(c => c.parentId === big._id)
       })
-      this.setData({ bigCategories, childMap })
+      this.setData({
+        bigCategories,
+        visibleBigCategories: filterBigCategories(bigCategories, this.data.activeTab),
+        childMap
+      })
     }).catch(err => {
       console.error('loadCategories:', err)
       wx.showToast({ title: '加载分类失败', icon: 'none' })
@@ -57,7 +68,10 @@ Page({
 
   switchTab(e) {
     const tab = e.currentTarget.dataset.tab
-    this.setData({ activeTab: tab })
+    this.setData({
+      activeTab: tab,
+      visibleBigCategories: filterBigCategories(this.data.bigCategories, tab)
+    })
   },
 
   // ===== 大类改名 =====
@@ -102,7 +116,7 @@ Page({
         categoryId: this.data.renameTarget._id,
         name,
         icon: this.data.renameIcon,
-        bookId: app.globalData?.bookId || app.getBookId(),
+        bookId: app.getBookId(),
         isTest: config.isTest
       }
     }).then(res => {
@@ -125,7 +139,7 @@ Page({
   onDeleteChild(e) {
     const cat = e.currentTarget.dataset.cat
     const app = getApp()
-    const bookId = app.globalData?.bookId || app.getBookId()
+    const bookId = app.getBookId()
     // 检查记录数
     wx.cloud.callFunction({
       name: 'record',
@@ -193,7 +207,7 @@ Page({
       data: {
         action: 'deleteBig',
         categoryId: cat._id,
-        bookId: app.globalData?.bookId || app.getBookId(),
+        bookId: app.getBookId(),
         isTest: config.isTest
       }
     }).then(res => {
@@ -217,7 +231,7 @@ Page({
         action: 'deleteChild',
         categoryId: this.data.deleteTarget._id,
         mergeTargetId: mergeTargetId || undefined,
-        bookId: app.globalData?.bookId || app.getBookId(),
+        bookId: app.getBookId(),
         isTest: config.isTest
       }
     }).then(res => {
@@ -249,8 +263,13 @@ Page({
   onAddBigNameInput(e) {
     this.setData({ newBigName: e.detail.value })
   },
+  onSelectAddBigEmoji(e) {
+    const newBigIcon = emojiFromIndex(this.data.commonEmojis, e)
+    console.log('select add-big emoji:', newBigIcon)
+    this.setData({ newBigIcon })
+  },
   onAddBigIconInput(e) {
-    this.setData({ newBigIcon: e.detail.value || '📌' })
+    this.setData({ newBigIcon: emojiFromInput(e) })
   },
   confirmAddBig() {
     const name = this.data.newBigName.trim()
@@ -266,7 +285,7 @@ Page({
         name,
         icon: this.data.newBigIcon,
         type: this.data.activeTab,
-        bookId: app.globalData?.bookId || app.getBookId(),
+        bookId: app.getBookId(),
         isTest: config.isTest
       }
     }).then(res => {
@@ -309,7 +328,7 @@ Page({
         action: 'addChild',
         name,
         parentId: this.data.addChildParentId,
-        bookId: app.globalData?.bookId || app.getBookId(),
+        bookId: app.getBookId(),
         isTest: config.isTest
       }
     }).then(res => {
@@ -335,7 +354,5 @@ Page({
     })
   },
 
-  filteredBigCategories() {
-    return this.data.bigCategories.filter(c => c.type === this.data.activeTab)
-  }
+  stopBubble() {}
 })

@@ -7,8 +7,199 @@
   background: #FFFFFF;
 }
 
+.budget-card {
+  margin: 20rpx 30rpx;
+  padding: 30rpx;
+  background: #FFFFFF;
+  border-radius: 16rpx;
+}
+
+.budget-header,
+.budget-main,
+.budget-meta {
+  display: flex;
+  align-items: center;
+}
+
+.budget-header {
+  justify-content: space-between;
+}
+
+.budget-title {
+  font-size: 30rpx;
+  font-weight: bold;
+  color: #333333;
+}
+
+.budget-detail {
+  color: #FF7900;
+  font-size: 24rpx;
+}
+
+.budget-main {
+  margin: 28rpx 0 18rpx;
+  align-items: flex-end;
+}
+
+.budget-remaining {
+  font-size: 54rpx;
+  font-weight: bold;
+  color: #333333;
+}
+
+.budget-unit {
+  margin: 0 0 8rpx 10rpx;
+  color: #999999;
+  font-size: 24rpx;
+}
+
+.budget-percent {
+  margin: 0 0 8rpx auto;
+  color: #42B983;
+  font-size: 26rpx;
+  font-weight: bold;
+}
+
+.budget-percent.warning {
+  color: #FFAD33;
+}
+
+.budget-percent.over {
+  color: #F45B55;
+}
+
+.budget-progress {
+  height: 16rpx;
+  overflow: hidden;
+  background: #EEEEEE;
+  border-radius: 16rpx;
+}
+
+.budget-progress-fill {
+  height: 100%;
+  background: #42B983;
+  border-radius: 16rpx;
+}
+
+.budget-progress-fill.warning {
+  background: #FFAD33;
+}
+
+.budget-progress-fill.over {
+  background: #F45B55;
+}
+
+.budget-meta {
+  justify-content: space-between;
+  margin-top: 14rpx;
+  color: #888888;
+  font-size: 22rpx;
+}
+
+.budget-pace {
+  margin-top: 22rpx;
+  padding: 20rpx 24rpx;
+  color: #8F5A0C;
+  font-size: 22rpx;
+  background: #FFF7E9;
+  border-radius: 12rpx;
+}
+
+.budget-empty {
+  padding: 28rpx 0 10rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.budget-empty-icon {
+  width: 90rpx;
+  height: 90rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #FFF1DD;
+  border-radius: 28rpx;
+  font-size: 40rpx;
+}
+
+.budget-empty-title {
+  margin-top: 18rpx;
+  color: #333333;
+  font-size: 28rpx;
+  font-weight: bold;
+}
+
+.budget-empty-note {
+  margin-top: 10rpx;
+  color: #999999;
+  font-size: 22rpx;
+}
+
+.budget-set-btn {
+  margin-top: 22rpx;
+  padding: 0 34rpx;
+  height: 70rpx;
+  line-height: 70rpx;
+  color: #FFFFFF;
+  background: #FF9500;
+  border-radius: 35rpx;
+  font-size: 24rpx;
+}
+
+.budget-set-btn::after {
+  border: none;
+}
+
 .record-list {
   padding-bottom: 150rpx;
+}
+
+.day-group {
+  margin-top: 10rpx;
+}
+
+.day-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 22rpx 30rpx 8rpx;
+}
+
+.day-title-wrap {
+  display: flex;
+  align-items: baseline;
+}
+
+.day-title {
+  color: #333333;
+  font-size: 32rpx;
+  font-weight: bold;
+}
+
+.day-subtitle {
+  margin-left: 12rpx;
+  color: #999999;
+  font-size: 22rpx;
+}
+
+.day-total {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  color: #999999;
+  font-size: 22rpx;
+  line-height: 1.35;
+}
+
+.day-income {
+  color: #4CAF50;
+  font-weight: 500;
+}
+
+.day-expense {
+  color: #FF6B00;
+  font-weight: 500;
 }
 
 .empty {

@@ -1,7 +1,7 @@
 {
   "name": "clear-test-data",
   "version": "1.0.0",
-  "description": "清空测试环境集合数据",
+  "description": "清空测试数据，或在管理员双重确认后一次性清空生产数据",
   "main": "index.js",
   "dependencies": {
     "wx-server-sdk": "~2.6.3"

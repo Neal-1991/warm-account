@@ -67,3 +67,7 @@
   color: #CCC;
   margin-top: 8rpx;
 }
+
+.meta.date-hidden .creator {
+  margin-top: 0;
+}

@@ -1,10 +1,12 @@
 const config = require('../../utils/config')
+const { budgetMenuStatus } = require('../../utils/budget')
 
 Page({
   data: {
     userInfo: null,
     showEditModal: false,
-    editingNickName: ''
+    editingNickName: '',
+    budgetStatus: ''
   },
 
   onLoad() {
@@ -15,15 +17,34 @@ Page({
     this.loadUserInfo()
   },
 
-  loadUserInfo() {
+  async loadUserInfo() {
     const app = getApp()
+    const session = await app.ensureSession()
     const userInfo = app.getUserInfo()
-    const isLoggedIn = !!app.globalData.openId
     this.setData({
       userInfo,
-      isLoggedIn,
-      editingNickName: userInfo?.nickName || ''
+      isLoggedIn: session.authenticated,
+      editingNickName: userInfo?.nickName || '',
+      budgetStatus: session.authenticated ? '加载中...' : ''
     })
+    if (session.authenticated && session.bookId) {
+      const now = new Date()
+      const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+      wx.cloud.callFunction({
+        name: 'budget',
+        data: {
+          action: 'getMonth',
+          bookId: session.bookId,
+          month,
+          isTest: config.isTest
+        }
+      }).then(res => {
+        this.setData({ budgetStatus: budgetMenuStatus(res.result) })
+      }).catch(error => {
+        console.error('load mine budget status error:', error)
+        this.setData({ budgetStatus: '本月预算' })
+      })
+    }
   },
 
   // 导航到登录页
@@ -43,12 +64,18 @@ Page({
     }
   },
 
-  goToFamily() {
-    if (!getApp().globalData.openId) {
-      wx.navigateTo({ url: '/pages/login/login' })
-      return
-    }
-    wx.navigateTo({ url: '/pages/family/family' })
+  async goToFamily() {
+    const session = await getApp().ensureSession()
+    wx.navigateTo({
+      url: session.authenticated ? '/pages/family/family' : '/pages/login/login'
+    })
+  },
+
+  async goToBudget() {
+    const session = await getApp().ensureSession()
+    wx.navigateTo({
+      url: session.authenticated ? '/pages/budget/budget' : '/pages/login/login'
+    })
   },
 
   goToAbout() {
@@ -56,8 +83,9 @@ Page({
   },
 
   // 显示编辑弹窗
-  onShowEditModal() {
-    if (!getApp().globalData.openId) {
+  async onShowEditModal() {
+    const session = await getApp().ensureSession()
+    if (!session.authenticated) {
       wx.navigateTo({ url: '/pages/login/login' })
       return
     }
@@ -103,7 +131,7 @@ Page({
       // 昵称有变时，同步更新历史账单中的记账人
       if (oldNickName !== nickName) {
         const app = getApp()
-        const openId = app.globalData.openId
+        const openId = app.getOpenId()
         if (openId) {
           wx.cloud.callFunction({
             name: 'record',
@@ -125,7 +153,7 @@ Page({
           action: 'updateProfile',
           nickName,
           avatarUrl: avatarUrl || '',
-          bookId: getApp().globalData.bookId || '',
+          bookId: getApp().getBookId() || '',
           isTest: config.isTest
         }
       }).catch(err => {

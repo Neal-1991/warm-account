@@ -3,6 +3,22 @@
     <month-selector month="{{currentMonth}}" bindchange="onMonthChange" />
   </view>
 
+  <view class="budget-strip" bindtap="goToBudget">
+    <view wx:if="{{budgetView.configured}}">
+      <text class="budget-strip-title">总预算已使用 {{budgetView.percent}}%</text>
+      <text class="budget-strip-note">已花 ¥{{budgetView.usedAmount}} / ¥{{budgetView.limitAmount}}</text>
+    </view>
+    <view wx:else>
+      <text class="budget-strip-title">
+        {{budgetView.isHistorical ? '该月未设置分类预算' : (budgetView.canEdit ? '本月尚未设置分类预算' : '管理员暂未设置分类预算')}}
+      </text>
+      <text class="budget-strip-note">饼图和分类占比仍按实际支出展示</text>
+    </view>
+    <text wx:if="{{budgetView.configured || budgetView.canEdit}}" class="budget-strip-link">
+      {{budgetView.configured ? '详情 ›' : '去设置 ›'}}
+    </text>
+  </view>
+
   <view class="chart-container">
     <ec-canvas id="pie-chart" canvas-id="pie-chart" ec="{{ecChart}}"></ec-canvas>
   </view>
@@ -10,10 +26,27 @@
   <view class="legend">
     <block wx:for="{{legend}}" wx:key="name">
       <view class="legend-item">
-        <view class="color-dot" style="background: {{item.color}};"></view>
-        <text class="name">{{item.name}}</text>
-        <text class="amount">¥{{item.amount}}</text>
-        <text class="percent">{{item.percent}}%</text>
+        <view class="legend-main">
+          <view class="color-dot" style="background: {{item.color}};"></view>
+          <text class="name">{{item.name}}</text>
+          <text class="amount">¥{{item.amount}}</text>
+          <text class="percent">{{item.percent}}%</text>
+        </view>
+        <view wx:if="{{item.hasBudget}}" class="category-budget">
+          <view class="category-budget-meta">
+            <text>预算 ¥{{item.budgetAmount}}</text>
+            <text class="{{item.budgetIsOver ? 'over-text' : (item.budgetStatus === 'warning' ? 'warning-text' : 'normal-text')}}">
+              {{item.budgetIsOver ? '超支' : '剩余'}} ¥{{item.budgetRemainingAmount}}
+            </text>
+          </view>
+          <view class="category-progress">
+            <view
+              class="category-progress-fill {{item.budgetStatus}}"
+              style="width: {{item.budgetProgressWidth}}%;"
+            ></view>
+          </view>
+        </view>
+        <view wx:elif="{{budgetView.configured}}" class="no-category-budget">未单独设置分类预算</view>
       </view>
     </block>
     <view wx:if="{{legend.length === 0}}" class="empty">

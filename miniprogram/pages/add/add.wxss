@@ -156,3 +156,67 @@
 .submit-btn[disabled] {
   background: #CCC;
 }
+
+.budget-notice {
+  position: fixed;
+  left: 24rpx;
+  right: 24rpx;
+  bottom: 146rpx;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  padding: 24rpx 26rpx;
+  color: #FFFFFF;
+  background: #3B3028;
+  border-radius: 24rpx;
+  box-shadow: 0 16rpx 44rpx rgba(35, 24, 18, 0.28);
+  animation: budget-notice-in 0.25s ease-out;
+}
+
+.budget-notice-icon {
+  flex: 0 0 58rpx;
+  width: 58rpx;
+  height: 58rpx;
+  margin-right: 20rpx;
+  color: #FFFFFF;
+  font-size: 32rpx;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #D68418;
+  border-radius: 50%;
+}
+
+.budget-notice.over .budget-notice-icon {
+  background: #F45B55;
+}
+
+.budget-notice-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.budget-notice-title {
+  font-size: 28rpx;
+  font-weight: bold;
+  line-height: 1.4;
+}
+
+.budget-notice-message {
+  margin-top: 6rpx;
+  color: #EADFD5;
+  font-size: 24rpx;
+  line-height: 1.4;
+}
+
+@keyframes budget-notice-in {
+  from {
+    opacity: 0;
+    transform: translateY(20rpx);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

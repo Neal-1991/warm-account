@@ -13,6 +13,12 @@
       <text class="label">家庭</text>
       <text class="arrow">›</text>
     </view>
+    <view class="menu-item" bindtap="goToBudget">
+      <text class="icon">🎯</text>
+      <text class="label">预算管理</text>
+      <text wx:if="{{isLoggedIn}}" class="menu-status">{{budgetStatus}}</text>
+      <text class="arrow">›</text>
+    </view>
     <view class="menu-item" bindtap="goToAbout">
       <text class="icon">ℹ️</text>
       <text class="label">关于</text>
