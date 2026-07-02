@@ -1,7 +1,10 @@
 // cloudfunctions/record/index.js
 const cloud = require('wx-server-sdk')
+const { selectBudgetAlert } = require('./budget-alert')
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const db = cloud.database()
+const _ = db.command
+const PAGE_SIZE = 100
 
 const getCollectionName = (event, name) => {
   const suffix = event.isTest !== undefined ? (event.isTest ? '_test' : '_prod') : '_test'
@@ -32,6 +35,14 @@ exports.main = async (event, context) => {
     return book
   }
 
+  const assertBookWritable = async (id) => {
+    const book = await assertBookMember(id)
+    if (book.joinTargetBookId) {
+      throw new Error('账本正在合并，请稍后再试')
+    }
+    return book
+  }
+
   const assertCategoryInBook = async (categoryId, targetBookId, type) => {
     const res = await db.collection(collectionName('categories')).doc(categoryId).get()
     const category = res.data
@@ -39,6 +50,68 @@ exports.main = async (event, context) => {
       throw new Error('invalid category')
     }
     return category
+  }
+
+  const getAll = async query => {
+    const result = []
+    let offset = 0
+    while (true) {
+      const batch = await query.skip(offset).limit(PAGE_SIZE).get()
+      result.push(...batch.data)
+      if (batch.data.length < PAGE_SIZE) return result
+      offset += batch.data.length
+    }
+  }
+
+  const monthRange = month => {
+    const [year, monthNumber] = month.split('-').map(Number)
+    return {
+      startDate: new Date(Date.UTC(year, monthNumber - 1, 1)),
+      endDate: new Date(Date.UTC(year, monthNumber, 1))
+    }
+  }
+
+  const prepareBudgetAlert = async (category, amount, date) => {
+    const month = typeof date === 'string'
+      ? date.slice(0, 7)
+      : new Date(date).toISOString().slice(0, 7)
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return null
+
+    const budgetResult = await db.collection(collectionName('budgets'))
+      .where({ bookId, month })
+      .limit(1)
+      .get()
+    const budget = budgetResult.data[0]
+    if (!budget) return null
+
+    const { startDate, endDate } = monthRange(month)
+    const [records, categories] = await Promise.all([
+      getAll(db.collection(collectionName('records')).where({
+        bookId,
+        type: 'expense',
+        date: _.gte(startDate).and(_.lt(endDate))
+      })),
+      getAll(db.collection(collectionName('categories')).where({ bookId }))
+    ])
+    const categoryMap = new Map(categories.map(item => [item._id, item]))
+    const bigCategoryId = category.parentId || category._id
+    const previousTotal = records.reduce((sum, record) => sum + record.amount, 0)
+    const previousCategory = records.reduce((sum, record) => {
+      const recordCategory = categoryMap.get(record.categoryId)
+      const recordBigId = recordCategory?.parentId || recordCategory?._id
+      return recordBigId === bigCategoryId ? sum + record.amount : sum
+    }, 0)
+    const categoryLimit = (budget.categoryLimits || [])
+      .find(limit => limit.categoryId === bigCategoryId)
+
+    return selectBudgetAlert({
+      previousTotal,
+      nextTotal: previousTotal + amount,
+      totalLimit: budget.totalAmount,
+      previousCategory,
+      nextCategory: previousCategory + amount,
+      categoryLimit
+    })
   }
 
   const getAuthorizedRecord = async (allowAdmin = false) => {
@@ -66,11 +139,22 @@ exports.main = async (event, context) => {
         if (!bookId) {
           return { success: false, error: 'bookId is required' }
         }
-        await assertBookMember(bookId)
+        await assertBookWritable(bookId)
         if (!data.type || !data.amount || !data.categoryId || !data.date) {
           return { success: false, error: 'Missing required fields: type, amount, categoryId, date' }
         }
-        await assertCategoryInBook(data.categoryId, bookId, data.type)
+        if (!Number.isInteger(data.amount) || data.amount <= 0) {
+          return { success: false, error: 'amount must be a positive integer' }
+        }
+        const category = await assertCategoryInBook(data.categoryId, bookId, data.type)
+        let budgetAlert = null
+        if (data.type === 'expense') {
+          try {
+            budgetAlert = await prepareBudgetAlert(category, data.amount, data.date)
+          } catch (budgetError) {
+            console.error('prepare budget alert failed:', budgetError)
+          }
+        }
 
         const { _id } = await db.collection(collectionName('records')).add({
           data: {
@@ -87,7 +171,7 @@ exports.main = async (event, context) => {
             updatedAt: db.serverDate()
           }
         })
-        return { success: true, recordId: _id }
+        return { success: true, recordId: _id, budgetAlert }
       }
 
       case 'list': {
@@ -106,7 +190,7 @@ exports.main = async (event, context) => {
         const records = await db.collection(collectionName('records'))
           .where({
             bookId,
-            date: db.command.gte(startDate).and(db.command.lt(endDate))
+            date: _.gte(startDate).and(_.lt(endDate))
           })
           .orderBy('date', 'desc')
           .orderBy('createdAt', 'desc')
@@ -128,7 +212,10 @@ exports.main = async (event, context) => {
       }
 
       case 'update': {
-        const { record } = await getAuthorizedRecord(true)
+        const { record, book } = await getAuthorizedRecord(true)
+        if (book.joinTargetBookId) {
+          throw new Error('账本正在合并，请稍后再试')
+        }
         const updateData = {}
         if (data.type !== undefined) updateData.type = data.type
         if (data.amount !== undefined) updateData.amount = data.amount
@@ -148,7 +235,10 @@ exports.main = async (event, context) => {
       }
 
       case 'delete': {
-        await getAuthorizedRecord(true)
+        const { book } = await getAuthorizedRecord(true)
+        if (book.joinTargetBookId) {
+          throw new Error('账本正在合并，请稍后再试')
+        }
         await db.collection(collectionName('records')).doc(recordId).remove()
         return { success: true }
       }

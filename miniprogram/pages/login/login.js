@@ -8,14 +8,15 @@ Page({
 
   onLoad() {
     const app = getApp()
-    if (app.globalData.openId) {
+    app.ensureSession().then(session => {
+      if (!session.authenticated) return
       const pages = getCurrentPages()
       if (pages.length > 1) {
         wx.navigateBack()
       } else {
         wx.switchTab({ url: '/pages/index/index' })
       }
-    }
+    })
   },
 
   onAgreementChange(e) {
@@ -44,12 +45,12 @@ Page({
 
       if (res.result.success) {
         const app = getApp()
-        app.setBookId(res.result.bookId)
-        app.setOpenId(res.result.openId)
-
-        // 保存用户信息（优先使用云函数返回的持久化资料）
         const userInfo = res.result.userInfo || { nickName: '微信用户', avatarUrl: '' }
-        app.setUserInfo(userInfo)
+        app.setSession({
+          bookId: res.result.bookId,
+          openId: res.result.openId,
+          userInfo
+        })
 
         // 分类初始化已由 login 云函数内部处理（新账本自动创建，已有账本自动迁移）
 

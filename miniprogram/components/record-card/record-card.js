@@ -8,7 +8,8 @@ Component({
     amount: { type: String },
     dateStr: { type: String },
     createdByName: { type: String },
-    hasImages: { type: Boolean, value: false }
+    hasImages: { type: Boolean, value: false },
+    hideDate: { type: Boolean, value: false }
   },
   data: {},
   methods: {

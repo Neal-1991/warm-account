@@ -12,55 +12,16 @@ const getSuffix = (event) => {
   return '_test'
 }
 
-// 确保账本有分类：新账本初始化预设，已有账本自动迁移
-const ensureCategories = async (bookId, openId, isTest) => {
-  const suffix = isTest !== undefined ? (isTest ? '_test' : '_prod') : '_test'
-  const col = (name) => `${name}${suffix}`
-  const db = cloud.database()
-
-  try {
-    // 检查是否已有 per-book 大类
-    const existing = await db.collection(col('categories'))
-      .where({ bookId, parentId: null })
-      .limit(1)
-      .get()
-    if (existing.data.length > 0) {
-      return // 已初始化，跳过
-    }
-  } catch (e) {
-    console.error('ensureCategories check existing error:', e)
-    return
+// init-database 负责按 categorySchemaVersion 幂等初始化或续补分类。
+const ensureCategories = async (bookId, isTest) => {
+  const initRes = await cloud.callFunction({
+    name: 'init-database',
+    data: { bookId, isTest }
+  })
+  if (!initRes.result || !initRes.result.success) {
+    throw new Error(initRes.result?.error || 'category initialization failed')
   }
-
-  // 尝试迁移（存量用户：复制 bookId=null 系统预设 → per-book，remap 记录）
-  try {
-    const migrateRes = await cloud.callFunction({
-      name: 'category',
-      data: { action: 'migrate', openId, isTest }
-    })
-    if (migrateRes.result?.success) {
-      const migrated = migrateRes.result.results?.find(
-        r => r.bookId === bookId && r.status === 'migrated' && r.categoryCount > 0
-      )
-      if (migrated) {
-        console.log(`ensureCategories: migrated book ${bookId}`)
-        return
-      }
-    }
-  } catch (e) {
-    console.error('ensureCategories migrate error:', e)
-  }
-
-  // 回退：创建全新预设分类（新用户或 bookId=null 预设不存在的场景）
-  try {
-    await cloud.callFunction({
-      name: 'init-database',
-      data: { bookId, isTest }
-    })
-    console.log(`ensureCategories: initialized book ${bookId}`)
-  } catch (e) {
-    console.error('ensureCategories init-database error:', e)
-  }
+  return initRes.result
 }
 
 exports.main = async (event, context) => {
@@ -75,6 +36,48 @@ exports.main = async (event, context) => {
 
     const db = cloud.database()
     const _ = db.command
+
+    if (action === 'restoreSession') {
+      if (!openId) {
+        return { success: true, authenticated: false }
+      }
+
+      const books = await db.collection(collectionName('books'))
+        .where(_.or([{ ownerId: openId }, { memberIds: openId }]))
+        .get()
+      if (books.data.length === 0) {
+        return { success: true, authenticated: false, openId }
+      }
+
+      const activeBook = books.data.find(book => !book.joinTargetBookId) || books.data[0]
+      const members = await db.collection(collectionName('members'))
+        .where({ openId })
+        .limit(1)
+        .get()
+      const member = members.data[0]
+      let userInfo = member
+        ? {
+            nickName: member.nickName || '微信用户',
+            avatarUrl: member.avatarUrl || ''
+          }
+        : null
+
+      if (userInfo?.avatarUrl?.startsWith('cloud://')) {
+        userInfo.avatarUrl = await cloud.getTempFileURL({
+          fileList: [userInfo.avatarUrl]
+        }).then(result =>
+          result.fileList?.[0]?.tempFileURL || userInfo.avatarUrl
+        ).catch(() => userInfo.avatarUrl)
+      }
+
+      return {
+        success: true,
+        authenticated: true,
+        openId,
+        bookId: activeBook._id,
+        userInfo
+      }
+    }
 
     // profile update (called from mine page)
     if (action === 'updateProfile') {
@@ -212,8 +215,7 @@ exports.main = async (event, context) => {
 
     if (books.data.length > 0) {
       const bookId = books.data[0]._id
-      await ensureCategories(bookId, openId, event.isTest).catch(e =>
-        console.error('ensureCategories failed:', e))
+      await ensureCategories(bookId, event.isTest)
       return { success: true, bookId, isNew: false, openId, userInfo }
     }
 
@@ -224,14 +226,14 @@ exports.main = async (event, context) => {
         memberIds: [openId],
         inviteCode: '',
         inviteCodeExpire: null,
+        categorySchemaVersion: 0,
         createdAt: db.serverDate(),
         updatedAt: db.serverDate()
       }
     })
 
     // 等待分类创建完成再返回（新用户必须有分类才能记账）
-    await ensureCategories(_id, openId, event.isTest).catch(e =>
-      console.error('ensureCategories failed:', e))
+    await ensureCategories(_id, event.isTest)
     return { success: true, bookId: _id, isNew: true, openId, userInfo }
   } catch (err) {
     console.error('login cloud function error:', err)

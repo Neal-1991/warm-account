@@ -8,6 +8,7 @@
     "pages/family/family",
     "pages/about/about",
     "pages/category-manage/category-manage",
+    "pages/budget/budget",
     "pages/detail/detail"
   ],
   "tabBar": {

@@ -55,7 +55,9 @@
   </view>
 
   <!-- 提交按钮 -->
-  <button class="submit-btn" type="primary" bindtap="onSubmit" disabled="{{!canSubmit}}">提交</button>
+  <button class="submit-btn" type="primary" bindtap="onSubmit" disabled="{{!canSubmit || submitting}}">
+    {{submitting ? '保存中...' : '提交'}}
+  </button>
 
   <!-- 分类选择器 -->
   <category-picker
@@ -67,4 +69,12 @@
     bind:addchild="onAddChild"
     bind:addbig="onAddBig"
   />
+
+  <view wx:if="{{showBudgetAlert}}" class="budget-notice {{budgetAlertView.level}}">
+    <view class="budget-notice-icon">!</view>
+    <view class="budget-notice-content">
+      <view class="budget-notice-title">{{budgetAlertView.title}}</view>
+      <view class="budget-notice-message">{{budgetAlertView.message}}</view>
+    </view>
+  </view>
 </view>

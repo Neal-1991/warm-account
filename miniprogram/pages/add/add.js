@@ -1,5 +1,6 @@
 const dateUtil = require('../../utils/date')
 const config = require('../../utils/config')
+const { budgetAlertContent } = require('../../utils/budget')
 
 Page({
   data: {
@@ -13,7 +14,9 @@ Page({
     showCategoryPicker: false,
     categories: [],
     canSubmit: false,
-    submitting: false
+    submitting: false,
+    showBudgetAlert: false,
+    budgetAlertView: null
   },
 
   onLoad() {
@@ -31,12 +34,51 @@ Page({
     this.loadCategories()
   },
 
-  loadCategories() {
+  onUnload() {
+    this.clearReturnTimer()
+  },
+
+  clearReturnTimer() {
+    if (this._returnTimer) {
+      clearTimeout(this._returnTimer)
+      this._returnTimer = null
+    }
+  },
+
+  scheduleHomeReturn(delay = 2000) {
+    this.clearReturnTimer()
+    this._returnTimer = setTimeout(() => {
+      this.returnToHome()
+    }, delay)
+  },
+
+  returnToHome() {
+    if (this._returningHome) return
+    this._returningHome = true
+    this.clearReturnTimer()
+    this.setData({ showBudgetAlert: false })
+    wx.switchTab({
+      url: '/pages/index/index',
+      fail: () => {
+        this._returningHome = false
+        this.setData({ submitting: false })
+        wx.showToast({ title: '返回首页失败，请稍后重试', icon: 'none' })
+      }
+    })
+  },
+
+  async loadCategories() {
     const app = getApp()
+    const session = await app.ensureSession()
+    const bookId = session.bookId || app.getBookId()
+    if (!session.authenticated || !bookId) {
+      this.setData({ categories: [] })
+      return
+    }
     const { type } = this.data
     wx.cloud.callFunction({
       name: 'category',
-      data: { action: 'list', bookId: app.globalData.bookId, isTest: config.isTest, type }
+      data: { action: 'list', bookId, isTest: config.isTest, type }
     }).then(res => {
       if (res.result && res.result.success) {
         this.setData({ categories: res.result.categories })
@@ -86,11 +128,13 @@ Page({
 
   onAddChild(e) {
     const app = getApp()
+    const bookId = app.getBookId()
+    if (!bookId) return
     wx.cloud.callFunction({
       name: 'category',
       data: {
         action: 'addChild',
-        bookId: app.globalData.bookId,
+        bookId,
         name: e.detail.name,
         parentId: e.detail.parentId,
         isTest: config.isTest
@@ -109,11 +153,13 @@ Page({
 
   onAddBig(e) {
     const app = getApp()
+    const bookId = app.getBookId()
+    if (!bookId) return
     wx.cloud.callFunction({
       name: 'category',
       data: {
         action: 'addBig',
-        bookId: app.globalData.bookId,
+        bookId,
         name: e.detail.name,
         icon: e.detail.icon,
         type: e.detail.type,
@@ -180,13 +226,15 @@ Page({
     )).then(results => results.map(r => r.fileID))
   },
 
-  onSubmit() {
+  async onSubmit() {
     if (this.data.submitting) {
       return
     }
 
     const app = getApp()
-    if (!app.globalData.bookId) {
+    const session = await app.ensureSession()
+    const bookId = session.bookId || app.getBookId()
+    if (!session.authenticated || !bookId) {
       wx.showToast({ title: '请先登录', icon: 'none' })
       return
     }
@@ -207,7 +255,7 @@ Page({
         name: 'record',
         data: {
           action: 'add',
-          bookId: app.globalData.bookId,
+          bookId,
           data: {
             type,
             amount: Math.round(amountNum * 100),
@@ -215,20 +263,26 @@ Page({
             date,
             remark,
             images: cloudFileIds,
-            openId: app.globalData.openId,
-            nickName: app.globalData.userInfo?.nickName || '未知'
+            nickName: app.getUserInfo()?.nickName || '未知'
           },
           isTest: config.isTest
         }
       }).then(res => {
         wx.hideLoading()
-        this.setData({ submitting: false })
         if (res.result && res.result.success) {
+          const alertView = budgetAlertContent(res.result.budgetAlert)
+          if (alertView) {
+            this.setData({
+              showBudgetAlert: true,
+              budgetAlertView: alertView
+            })
+            this.scheduleHomeReturn(2000)
+            return
+          }
           wx.showToast({ title: '提交成功' })
-          setTimeout(() => {
-            wx.switchTab({ url: '/pages/index/index' })
-          }, 1500)
+          this.scheduleHomeReturn(1500)
         } else {
+          this.setData({ submitting: false })
           wx.showToast({ title: res.result?.error || '提交失败', icon: 'none' })
         }
       }).catch(err => {

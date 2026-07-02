@@ -53,8 +53,17 @@
 
     <!-- 添加大类 -->
     <view class="add-big-form" wx:if="{{showAddBig}}">
+      <view class="quick-emoji-picker">
+        <text
+          wx:for="{{commonEmojis}}"
+          wx:key="*this"
+          class="quick-emoji {{newBigIcon === item ? 'selected' : ''}}"
+          catchtap="onSelectAddBigEmoji"
+          data-index="{{index}}"
+        >{{item}}</text>
+      </view>
       <view class="add-big-fields">
-        <input class="icon-input" placeholder="📌" bindinput="onAddBigIconInput" value="{{newBigIcon}}" maxlength="2" />
+        <input class="icon-input" placeholder="📌" bindinput="onAddBigIconInput" value="{{newBigIcon}}" maxlength="8" />
         <input class="name-input" placeholder="输入新大类名称" bindinput="onAddBigNameInput" value="{{newBigName}}" />
         <button class="add-btn" bindtap="confirmAddBig">确定</button>
       </view>

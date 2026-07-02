@@ -168,6 +168,14 @@
   line-height: 1.5;
 }
 
+.dialog-progress {
+  display: block;
+  margin-top: 20rpx;
+  font-size: 24rpx;
+  color: #FF9500;
+  line-height: 1.5;
+}
+
 .dialog-actions {
   display: flex;
   border-top: 1px solid #F0F0F0;
@@ -197,6 +205,11 @@
 .dialog-btn-confirm {
   color: #FF9500;
   font-weight: bold;
+}
+
+.dialog-btn-cancel[disabled],
+.dialog-btn-confirm[disabled] {
+  color: #BBBBBB;
 }
 
 .dialog-btn-cancel::after,

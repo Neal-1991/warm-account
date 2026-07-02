@@ -36,10 +36,13 @@
       <view class="dialog-body">
         <text class="dialog-title">{{dialogBookName}}</text>
         <text class="dialog-desc">加入后，你的历史账目将合并到此账本</text>
+        <text class="dialog-progress" wx:if="{{joinProgressText}}">{{joinProgressText}}</text>
       </view>
       <view class="dialog-actions">
-        <button class="dialog-btn-cancel" bindtap="onDismissJoin">暂不加入</button>
-        <button class="dialog-btn-confirm" bindtap="onConfirmJoin">加入</button>
+        <button class="dialog-btn-cancel" bindtap="onDismissJoin" disabled="{{joining}}">暂不加入</button>
+        <button class="dialog-btn-confirm" bindtap="onConfirmJoin" disabled="{{joining}}">
+          {{joining ? '合并中' : '加入'}}
+        </button>
       </view>
     </view>
   </view>

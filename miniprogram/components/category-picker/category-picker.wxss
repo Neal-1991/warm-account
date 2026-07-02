@@ -143,6 +143,31 @@
   margin-top: 20rpx;
 }
 
+.quick-emoji-picker {
+  display: grid;
+  grid-template-columns: repeat(8, 60rpx);
+  gap: 12rpx;
+  max-height: 204rpx;
+  margin-bottom: 16rpx;
+  overflow-y: auto;
+}
+
+.quick-emoji {
+  width: 60rpx;
+  height: 60rpx;
+  line-height: 60rpx;
+  text-align: center;
+  font-size: 36rpx;
+  border: 2rpx solid transparent;
+  border-radius: 8rpx;
+  box-sizing: border-box;
+}
+
+.quick-emoji.selected {
+  border-color: #07c160;
+  background: #e8f8ef;
+}
+
 .add-big-fields {
   display: flex;
   align-items: center;

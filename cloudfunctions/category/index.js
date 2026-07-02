@@ -3,6 +3,13 @@ const cloud = require('wx-server-sdk')
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const db = cloud.database()
 const _ = db.command
+const PAGE_SIZE = 100
+
+const currentBeijingMonth = (now = new Date()) => {
+  return new Date(now.getTime() + 8 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 7)
+}
 
 const getCollectionName = (event, name) => {
   const suffix = event.isTest !== undefined ? (event.isTest ? '_test' : '_prod') : '_test'
@@ -25,6 +32,14 @@ exports.main = async (event, context) => {
     const book = await getBook(id)
     if (!book || (book.ownerId !== openId && !(book.memberIds || []).includes(openId))) {
       throw new Error('permission denied')
+    }
+    return book
+  }
+
+  const assertBookWritable = async (id) => {
+    const book = await assertBookMember(id)
+    if (book.joinTargetBookId || book.joinMigration) {
+      throw new Error('账本正在合并，请稍后再试')
     }
     return book
   }
@@ -60,18 +75,29 @@ exports.main = async (event, context) => {
         await assertBookMember(bookId)
         const whereCondition = { bookId }
         if (type) whereCondition.type = type
-        const categories = await db.collection(collectionName('categories'))
-          .where(whereCondition)
-          .orderBy('order', 'asc')
-          .get()
-        return { success: true, categories: categories.data }
+        const categories = []
+        let offset = 0
+        while (true) {
+          const batch = await db.collection(collectionName('categories'))
+            .where(whereCondition)
+            .orderBy('order', 'asc')
+            .skip(offset)
+            .limit(PAGE_SIZE)
+            .get()
+          categories.push(...batch.data)
+          if (batch.data.length < PAGE_SIZE) {
+            break
+          }
+          offset += batch.data.length
+        }
+        return { success: true, categories }
       }
 
       case 'addBig': {
         if (!name || !bookId) {
           return { success: false, error: 'name and bookId are required' }
         }
-        await assertBookMember(bookId)
+        await assertBookWritable(bookId)
         if (!type || !['expense', 'income'].includes(type)) {
           return { success: false, error: 'type must be expense or income' }
         }
@@ -116,7 +142,7 @@ exports.main = async (event, context) => {
         if (!name || !parentId || !bookId) {
           return { success: false, error: 'name, parentId and bookId are required' }
         }
-        await assertBookMember(bookId)
+        await assertBookWritable(bookId)
         const parent = await getCategoryInBook(parentId, bookId)
         if (parent.parentId !== null) {
           return { success: false, error: 'parentId must be a big category' }
@@ -149,7 +175,7 @@ exports.main = async (event, context) => {
         if (!categoryId || !bookId) {
           return { success: false, error: 'categoryId and bookId are required' }
         }
-        await assertBookMember(bookId)
+        await assertBookWritable(bookId)
         const cat = await getCategoryInBook(categoryId, bookId)
 
         const updateData = {}
@@ -182,7 +208,7 @@ exports.main = async (event, context) => {
         if (!categoryId || !bookId) {
           return { success: false, error: 'categoryId and bookId are required' }
         }
-        await assertBookMember(bookId)
+        await assertBookWritable(bookId)
         const cat = await getCategoryInBook(categoryId, bookId)
         if (cat.parentId === null) {
           return { success: false, error: 'please use deleteBig for big categories' }
@@ -222,13 +248,28 @@ exports.main = async (event, context) => {
         if (!categoryId || !bookId) {
           return { success: false, error: 'categoryId and bookId are required' }
         }
-        await assertBookMember(bookId)
+        await assertBookWritable(bookId)
         const cat = await getCategoryInBook(categoryId, bookId)
         if (cat.isSystem) {
           return { success: false, error: '系统预设大类不可删除' }
         }
         if (cat.parentId !== null) {
           return { success: false, error: 'please use deleteChild for child categories' }
+        }
+
+        const activeBudgetCount = await db.collection(collectionName('budgets'))
+          .where({
+            bookId,
+            categoryIds: categoryId,
+            month: _.gte(currentBeijingMonth())
+          })
+          .count()
+        if (activeBudgetCount.total > 0) {
+          return {
+            success: false,
+            error: '该大类已被当前或未来预算使用，请先调整预算',
+            budgetCount: activeBudgetCount.total
+          }
         }
 
         const children = await db.collection(collectionName('categories'))
@@ -266,7 +307,7 @@ exports.main = async (event, context) => {
         if (!categoryId || !bookId) {
           return { success: false, error: 'categoryId and bookId are required' }
         }
-        await assertBookMember(bookId)
+        await assertBookWritable(bookId)
         await getCategoryInBook(categoryId, bookId)
         await db.collection(collectionName('categories')).doc(categoryId).update({
           data: { isVisible: false }
@@ -313,6 +354,7 @@ exports.main = async (event, context) => {
                 icon: big.icon,
                 order: big.order,
                 type: big.type,
+                presetKey: big.presetKey || '',
                 isVisible: big.isVisible !== false,
                 isSystem: true,
                 parentId: null,

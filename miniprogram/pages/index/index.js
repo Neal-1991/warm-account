@@ -1,140 +1,244 @@
 const dateUtil = require('../../utils/date')
 const config = require('../../utils/config')
+const {
+  buildCategoryDisplayMap,
+  resolveCategoryDisplay
+} = require('../../utils/category-display')
+const { buildBudgetView } = require('../../utils/budget')
+const {
+  buildRecordGroups,
+  summarizeRecords
+} = require('../../utils/homepage-records')
+
+const EMPTY_SUMMARY = { expense: '0.00', income: '0.00', balance: '0.00' }
+const EMPTY_BUDGET_VIEW = { configured: false, canEdit: false, isHistorical: false }
+
+function currentMonthValue(now = new Date()) {
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+}
+
+function monthDisplay(month) {
+  const [year, monthNum] = month.split('-').map(Number)
+  return `${year}年${monthNum}月`
+}
 
 Page({
   data: {
     currentMonth: '',
     currentMonthDisplay: '',
-    summary: { expense: '0.00', income: '0.00', balance: '0.00' },
-    records: []
+    summary: EMPTY_SUMMARY,
+    records: [],
+    recordGroups: [],
+    budgetView: EMPTY_BUDGET_VIEW
   },
 
   onLoad() {
-    const now = new Date()
-    const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    const month = currentMonthValue()
+    this._loadSeq = 0
+    this._skipNextShow = true
     this.setData({
       currentMonth: month,
-      currentMonthDisplay: `${now.getFullYear()}年${now.getMonth() + 1}月`
+      currentMonthDisplay: monthDisplay(month)
     })
     this.loadData()
   },
 
   onShow() {
+    if (this._skipNextShow) {
+      this._skipNextShow = false
+      return
+    }
     this.loadData()
   },
 
   onMonthChange(e) {
     const month = e.detail.month
-    const [year, monthNum] = month.split('-').map(Number)
     this.setData({
       currentMonth: month,
-      currentMonthDisplay: `${year}年${monthNum}月`
+      currentMonthDisplay: monthDisplay(month),
+      budgetView: EMPTY_BUDGET_VIEW
     })
     this.loadData()
   },
 
-  loadData() {
+  getLocalSession(app) {
+    if (wx.getStorageSync('manualLogout')) return null
+    const openId = app.getOpenId()
+    const bookId = app.getBookId()
+    if (!openId || !bookId) return null
+    return {
+      authenticated: true,
+      openId,
+      bookId,
+      userInfo: app.getUserInfo(),
+      source: 'local'
+    }
+  },
+
+  isCurrentLoad(loadSeq, month) {
+    return this._loadSeq === loadSeq && this.data.currentMonth === month
+  },
+
+  resetHomeData() {
+    this.setData({
+      records: [],
+      recordGroups: [],
+      summary: EMPTY_SUMMARY,
+      budgetView: EMPTY_BUDGET_VIEW
+    })
     const app = getApp()
-    if (!app.globalData.bookId) {
-      // 未登录时展示空状态，不请求数据
-      this.setData({ records: [], summary: { expense: '0.00', income: '0.00', balance: '0.00' } })
+    app.globalData._currentRecords = []
+  },
+
+  validateSessionInBackground(loadSeq, bookId) {
+    const app = getApp()
+    app.ensureSession().then(session => {
+      if (this._loadSeq !== loadSeq) return
+      if (!session.authenticated || !session.bookId) {
+        this._loadSeq += 1
+        this.resetHomeData()
+        return
+      }
+      if (session.bookId !== bookId) {
+        this.loadData()
+      }
+    }).catch(err => {
+      console.error('home session validation error:', err)
+    })
+  },
+
+  async loadData() {
+    const app = getApp()
+    const loadSeq = (this._loadSeq || 0) + 1
+    this._loadSeq = loadSeq
+
+    const localSession = this.getLocalSession(app)
+    if (localSession) {
+      this.validateSessionInBackground(loadSeq, localSession.bookId)
+      return this.loadHomeData(localSession, loadSeq)
+    }
+
+    const session = await app.ensureSession()
+    const month = this.data.currentMonth
+    if (!this.isCurrentLoad(loadSeq, month)) return
+
+    const bookId = session.bookId || app.getBookId()
+    if (!session.authenticated || !bookId) {
+      this.resetHomeData()
       return
     }
 
-    // 先获取分类，构建 categoryId -> {parentName, icon} 映射
-    wx.cloud.callFunction({
-      name: 'category',
-      data: { action: 'list', bookId: app.globalData.bookId, isTest: config.isTest }
-    }).then(catRes => {
-      const catInfoMap = {}
-      if (catRes.result && catRes.result.categories) {
-        const cats = catRes.result.categories
-        const bigNames = {}
-        cats.forEach(c => {
-          if (c.parentId === null) {
-            bigNames[c._id] = { name: c.name, icon: c.icon }
-          }
-        })
-        cats.forEach(c => {
-          if (c.parentId === null) {
-            catInfoMap[c._id] = { name: c.name, icon: c.icon }
-          } else {
-            const parent = bigNames[c.parentId]
-            catInfoMap[c._id] = parent ? { name: parent.name, icon: parent.icon } : { name: c.name, icon: c.icon }
-          }
-        })
-      }
+    return this.loadHomeData({ ...session, bookId }, loadSeq)
+  },
 
-      return wx.cloud.callFunction({
-        name: 'record',
-        data: {
-          action: 'list',
-          bookId: app.globalData.bookId,
-          data: { month: this.data.currentMonth },
-          isTest: config.isTest
-        }
-      }).then(res => [catInfoMap, res])
-    }).then(([catInfoMap, res]) => {
-      if (!res.result) {
+  async loadHomeData(session, loadSeq) {
+    const app = getApp()
+    const bookId = session.bookId || app.getBookId()
+    const month = this.data.currentMonth
+    if (!bookId) {
+      this.resetHomeData()
+      return
+    }
+
+    this.setData({ budgetView: EMPTY_BUDGET_VIEW })
+
+    const categoryPromise = wx.cloud.callFunction({
+      name: 'category',
+      data: { action: 'list', bookId, isTest: config.isTest }
+    })
+    const recordPromise = wx.cloud.callFunction({
+      name: 'record',
+      data: {
+        action: 'list',
+        bookId,
+        data: { month },
+        isTest: config.isTest
+      }
+    })
+
+    wx.cloud.callFunction({
+      name: 'budget',
+      data: {
+        action: 'getMonth',
+        bookId,
+        month,
+        isTest: config.isTest
+      }
+    }).then(budgetRes => {
+      if (!this.isCurrentLoad(loadSeq, month)) return
+      this.setData({
+        budgetView: buildBudgetView(budgetRes.result, month)
+      })
+    }).catch(error => {
+      if (!this.isCurrentLoad(loadSeq, month)) return
+      console.error('home budget load error:', error)
+    })
+
+    try {
+      const [catRes, recordRes] = await Promise.all([categoryPromise, recordPromise])
+      if (!this.isCurrentLoad(loadSeq, month)) return
+
+      if (!recordRes.result) {
         console.error('loadData: no result returned')
         wx.showToast({ title: '数据加载失败', icon: 'none' })
         return
       }
 
-      if (res.result.success) {
-        const defaultIcon = '📝'
-        const records = res.result.records.map(r => {
-          const catInfo = catInfoMap[r.categoryId]
-          return {
-            ...r,
-            amountDisplay: (r.amount / 100).toFixed(2),
-            dateStr: dateUtil.formatDate(new Date(r.date)),
-            icon: catInfo ? catInfo.icon : defaultIcon,
-            categoryName: catInfo ? catInfo.name : '未分类',
-            remark: r.remark || '',
-            hasImages: (r.images || []).length > 0
-          }
-        })
-
-        const summary = records.reduce((acc, r) => {
-          if (r.type === 'expense') {
-            acc.expense += r.amount
-          } else {
-            acc.income += r.amount
-          }
-          return acc
-        }, { expense: 0, income: 0 })
-
-        summary.balance = summary.income - summary.expense
-
-        this.setData({
-          records,
-          summary: {
-            expense: (summary.expense / 100).toFixed(2),
-            income: (summary.income / 100).toFixed(2),
-            balance: (summary.balance / 100).toFixed(2)
-          }
-        })
-
-        // 存储到 globalData，供详情页使用
-        const app = getApp()
-        app.globalData._currentRecords = records
-      } else {
-        console.error('loadData: success false', res.result.error)
+      if (!recordRes.result.success) {
+        console.error('loadData: success false', recordRes.result.error)
         wx.showToast({ title: '数据加载失败', icon: 'none' })
+        return
       }
-    }).catch(err => {
+
+      const catInfoMap = buildCategoryDisplayMap(catRes.result?.categories || [])
+      const records = (recordRes.result.records || []).map(record => {
+        const catInfo = resolveCategoryDisplay(catInfoMap, record.categoryId)
+        if (!catInfo.valid) {
+          console.warn('record category reference is invalid', {
+            recordId: record._id,
+            categoryId: record.categoryId,
+            reason: catInfo.reason
+          })
+        }
+        return {
+          ...record,
+          amountDisplay: (record.amount / 100).toFixed(2),
+          dateStr: dateUtil.formatDate(new Date(record.date)),
+          icon: catInfo.icon,
+          categoryName: catInfo.name,
+          remark: record.remark || '',
+          hasImages: (record.images || []).length > 0
+        }
+      })
+
+      this.setData({
+        records,
+        recordGroups: buildRecordGroups(records),
+        summary: summarizeRecords(records)
+      })
+
+      app.globalData._currentRecords = records
+    } catch (err) {
+      if (!this.isCurrentLoad(loadSeq, month)) return
       console.error('loadData error:', err)
       wx.showToast({ title: '数据加载失败', icon: 'none' })
+    }
+  },
+
+  async goToAdd() {
+    const session = await getApp().ensureSession()
+    wx.navigateTo({
+      url: session.authenticated ? '/pages/add/add' : '/pages/login/login'
     })
   },
 
-  goToAdd() {
-    if (!getApp().globalData.bookId) {
-      wx.navigateTo({ url: '/pages/login/login' })
-      return
-    }
-    wx.navigateTo({ url: '/pages/add/add' })
+  async goToBudget() {
+    const session = await getApp().ensureSession()
+    wx.navigateTo({
+      url: session.authenticated
+        ? `/pages/budget/budget?month=${this.data.currentMonth}`
+        : '/pages/login/login'
+    })
   },
 
   onRecordTap(e) {

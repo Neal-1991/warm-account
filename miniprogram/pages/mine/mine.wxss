@@ -52,6 +52,12 @@
   color: #333;
 }
 
+.menu-status {
+  margin-right: 12rpx;
+  color: #999999;
+  font-size: 22rpx;
+}
+
 .arrow {
   color: #CCC;
   font-size: 28rpx;

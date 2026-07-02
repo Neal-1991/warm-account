@@ -9,7 +9,8 @@ const COLLECTIONS = [
   { name: 'books', description: '账本集合' },
   { name: 'records', description: '账目记录集合' },
   { name: 'categories', description: '分类集合' },
-  { name: 'members', description: '成员信息集合' }
+  { name: 'members', description: '成员信息集合' },
+  { name: 'budgets', description: '月度预算集合' }
 ]
 
 // 环境后缀
@@ -40,7 +41,8 @@ exports.main = async (event, context) => {
         '2. 点击"云开发控制台"',
         '3. 进入"数据库"',
         '4. 点击"新建集合"',
-        '5. 分别创建: books_test, books_prod, records_test, records_prod, categories_test, categories_prod, members_test, members_prod'
+        '5. 分别创建: books_test, books_prod, records_test, records_prod, categories_test, categories_prod, members_test, members_prod, budgets_test, budgets_prod',
+        '6. 为 budgets_test 和 budgets_prod 创建 bookId + month 唯一索引'
       ]
     }
 
@@ -48,19 +50,23 @@ exports.main = async (event, context) => {
     // 目的是检测哪些集合已经存在
     const existingCollections = []
     const missingCollections = []
+    const actualCollections = COLLECTIONS.flatMap(col => [
+      `${col.name}${SUFFIX_TEST}`,
+      `${col.name}${SUFFIX_PROD}`
+    ])
 
-    for (const col of COLLECTIONS) {
+    for (const collection of actualCollections) {
       try {
         // 尝试查询一条记录来检测集合是否存在
-        await db.collection(col.name).limit(1).get()
-        existingCollections.push(col.name)
+        await db.collection(collection).limit(1).get()
+        existingCollections.push(collection)
       } catch (err) {
         if (err.message && err.message.includes('not exist')) {
-          missingCollections.push(col.name)
+          missingCollections.push(collection)
         } else {
           // 其他错误可能是权限问题或网络问题
-          console.log(`检测集合 ${col.name} 时出错:`, err.message)
-          missingCollections.push(col.name)
+          console.log(`检测集合 ${collection} 时出错:`, err.message)
+          missingCollections.push(collection)
         }
       }
     }

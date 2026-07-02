@@ -10,8 +10,8 @@
   <view class="amount-section">
     <text class="amount {{type}}">{{type === 'expense' ? '-' : '+'}}¥{{amount}}</text>
   </view>
-  <view class="meta">
-    <text class="date">{{dateStr}}</text>
+  <view class="meta {{hideDate ? 'date-hidden' : ''}}">
+    <text wx:if="{{!hideDate}}" class="date">{{dateStr}}</text>
     <text class="creator">{{createdByName}}</text>
   </view>
 </view>

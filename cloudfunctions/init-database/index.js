@@ -1,285 +1,236 @@
-// cloudfunctions/init-database/index.js
 const cloud = require('wx-server-sdk')
+const {
+  CATEGORY_SCHEMA_VERSION,
+  ALL_PRESETS
+} = require('./presets')
+const {
+  findBigCategory,
+  findChildCategory,
+  childPresetKey
+} = require('./preset-utils')
+
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
+const PAGE_SIZE = 100
 
 const getCollectionName = (event, name) => {
   const suffix = event.isTest !== undefined ? (event.isTest ? '_test' : '_prod') : '_test'
   return `${name}${suffix}`
 }
 
-// 支出 16 大类，按频率排序
-const EXPENSE_CATEGORIES = [
-  { name: '餐饮', icon: '🍜', order: 1, children: ['早餐', '午餐', '晚餐', '下午茶', '零食', '宵夜'] },
-  { name: '交通', icon: '🚗', order: 2, children: ['公交', '地铁', '出租车', '停车', '油费'] },
-  { name: '购物', icon: '🛒', order: 3, children: ['日用品', '电子产品', '化妆品'] },
-  { name: '居住', icon: '🏠', order: 4, children: ['房租', '物业', '水电费'] },
-  { name: '通讯', icon: '📱', order: 5, children: ['话费', '宽带', '流量'] },
-  { name: '育儿', icon: '👶', order: 6, children: ['奶粉', '尿布', '托育', '玩具衣物'] },
-  { name: '美容护肤', icon: '💄', order: 7, children: ['护肤品', '化妆品', '理发', '美甲'] },
-  { name: '服饰', icon: '👗', order: 8, children: ['衣服', '鞋子', '包包', '配饰'] },
-  { name: '娱乐', icon: '🎮', order: 9, children: ['电影', '游戏', '聚会'] },
-  { name: '运动健身', icon: '🏋', order: 10, children: ['健身房', '器材', '游泳', '球类'] },
-  { name: '旅行', icon: '✈️', order: 11, children: ['机票', '酒店', '景点', '在地消费'] },
-  { name: '宠物', icon: '🐱', order: 12, children: ['粮食', '零食', '疫苗驱虫', '用品'] },
-  { name: '医疗', icon: '💊', order: 13, children: ['门诊', '药品', '保健品'] },
-  { name: '人情', icon: '🎁', order: 14, children: ['礼物', '红包', '请客'] },
-  { name: '教育', icon: '📚', order: 15, children: ['学费', '教材', '培训'] },
-  { name: '其他', icon: '➕', order: 16, children: ['其他支出'] }
-]
+async function getAll(query) {
+  const result = []
+  let offset = 0
 
-// 收入 7 大类，按频率排序
-const INCOME_CATEGORIES = [
-  { name: '工资', icon: '💰', order: 21, children: ['基本工资', '绩效', '补贴'] },
-  { name: '奖金', icon: '🏆', order: 22, children: ['年终奖', '季度奖', '项目奖'] },
-  { name: '公积金', icon: '🏦', order: 23, children: ['公积金提取'] },
-  { name: '投资', icon: '📈', order: 24, children: ['股票', '基金', '理财', '利息'] },
-  { name: '副业兼职', icon: '💼', order: 25, children: ['咨询', '外包'] },
-  { name: '红包礼金', icon: '🧧', order: 26, children: ['春节红包', '婚礼礼金', '生日礼金'] },
-  { name: '其他', icon: '📦', order: 27, children: ['其他收入'] }
-]
-
-exports.main = async (event, context) => {
-  const { bookId, action } = event
-  const collectionName = (name) => getCollectionName(event, name)
-
-  // action=updateSystemPresets: 更新 bookId=null 系统预设（生产部署前执行）
-  if (action === 'updateSystemPresets') {
-    return exports.updateSystemPresets(event)
-  }
-
-  if (!bookId) {
-    return { success: false, error: 'bookId is required for init-database' }
-  }
-
-  try {
-    const col = collectionName('categories')
-
-    // 检查该账本是否已初始化（已有 bookId=该账本的大类即为已初始化）
-    const existingBig = await db.collection(col)
-      .where({ bookId, parentId: null })
-      .limit(1)
-      .get()
-    if (existingBig.data.length > 0) {
-      return { success: true, message: 'categories already initialized for this book' }
+  while (true) {
+    const batch = await query.skip(offset).limit(PAGE_SIZE).get()
+    result.push(...batch.data)
+    if (batch.data.length < PAGE_SIZE) {
+      return result
     }
-
-    // 所有分类均属于当前账本，isSystem: true
-    const allCats = [
-      ...EXPENSE_CATEGORIES.map(c => ({ ...c, type: 'expense' })),
-      ...INCOME_CATEGORIES.map(c => ({ ...c, type: 'income' }))
-    ]
-
-    // 并行创建所有大类（互不依赖）
-    const bigResults = await Promise.all(
-      allCats.map(cat =>
-        db.collection(col).add({
-          data: {
-            name: cat.name,
-            icon: cat.icon,
-            order: cat.order,
-            type: cat.type,
-            isVisible: true,
-            isSystem: true,
-            parentId: null,
-            bookId
-          }
-        })
-      )
-    )
-
-    // 并行创建所有子类
-    let childCount = 0
-    const childPromises = []
-    allCats.forEach((cat, i) => {
-      const parentId = bigResults[i]._id
-      cat.children.forEach(childName => {
-        childPromises.push(
-          db.collection(col).add({
-            data: {
-              name: childName,
-              icon: '',
-              order: 0,
-              type: cat.type,
-              isVisible: true,
-              isSystem: true,
-              parentId,
-              bookId
-            }
-          })
-        )
-        childCount++
-      })
-    })
-    await Promise.all(childPromises)
-
-    const totalCount = allCats.length + childCount
-    return { success: true, categoryCount: totalCount }
-  } catch (err) {
-    console.error('init-database error:', err)
-    return { success: false, error: err.message }
+    offset += batch.data.length
   }
 }
 
-// 导出供 login 云函数复用
-exports.EXPENSE_CATEGORIES = EXPENSE_CATEGORIES
-exports.INCOME_CATEGORIES = INCOME_CATEGORIES
-exports.getCollectionName = getCollectionName
+async function ensureBookPresets(event, bookId) {
+  const collectionName = name => getCollectionName(event, name)
+  const books = db.collection(collectionName('books'))
+  const categories = db.collection(collectionName('categories'))
+  const bookResult = await books.doc(bookId).get()
+  const book = bookResult.data
 
-// 可通过 action=updateSystemPresets 单独调用，用于生产部署前更新 bookId=null 预设
-exports.updateSystemPresets = async (event) => {
-  const collectionName = (name) => getCollectionName(event, name)
-  const col = collectionName('categories')
-  const batchStart = Number.isInteger(event.batchStart) ? event.batchStart : 0
-  const batchSize = Number.isInteger(event.batchSize) && event.batchSize > 0 ? event.batchSize : null
-
-  const allPresets = [
-    ...EXPENSE_CATEGORIES.map(c => ({ ...c, type: 'expense' })),
-    ...INCOME_CATEGORIES.map(c => ({ ...c, type: 'income' }))
-  ]
-  const targetPresets = batchSize ? allPresets.slice(batchStart, batchStart + batchSize) : allPresets
-
-  const upsertPreset = async (preset) => {
-    const existing = await db.collection(col)
-      .where({ bookId: null, parentId: null, name: preset.name, type: preset.type })
-      .limit(1)
-      .get()
-
-    let parentId
-    let createdParent = false
-    if (existing.data.length > 0) {
-      parentId = existing.data[0]._id
-      await db.collection(col).doc(parentId).update({
-        data: { icon: preset.icon, order: preset.order }
-      })
-    } else {
-      const result = await db.collection(col).add({
-        data: {
-          name: preset.name, icon: preset.icon, order: preset.order,
-          type: preset.type, isVisible: true, isSystem: true,
-          parentId: null, bookId: null
-        }
-      })
-      parentId = result._id
-      createdParent = true
-    }
-
-    const childRes = await db.collection(col)
-      .where({ bookId: null, parentId })
-      .limit(100)
-      .get()
-    const existingChildren = new Set(childRes.data.map(child => child.name))
-    const childCreates = preset.children
-      .filter(childName => !existingChildren.has(childName))
-      .map(childName => db.collection(col).add({
-        data: {
-          name: childName, icon: '', order: 0,
-          type: preset.type, isVisible: true, isSystem: true,
-          parentId, bookId: null
-        }
-      }))
-
-    await Promise.all(childCreates)
-    return {
-      updated: createdParent ? 0 : 1,
-      created: createdParent ? 1 : 0,
-      childrenCreated: childCreates.length
-    }
+  if (!book) {
+    return { success: false, error: 'book not found' }
   }
-
-  if (batchSize) {
-    const batchResults = await Promise.all(targetPresets.map(upsertPreset))
-    const totals = batchResults.reduce((sum, item) => ({
-      updated: sum.updated + item.updated,
-      created: sum.created + item.created,
-      childrenCreated: sum.childrenCreated + item.childrenCreated
-    }), { updated: 0, created: 0, childrenCreated: 0 })
-
+  if ((book.categorySchemaVersion || 0) >= CATEGORY_SCHEMA_VERSION) {
     return {
       success: true,
-      ...totals,
-      batchStart,
-      batchSize,
-      processed: targetPresets.length,
-      done: batchStart + batchSize >= allPresets.length,
-      total: allPresets.length
+      categorySchemaVersion: CATEGORY_SCHEMA_VERSION,
+      message: 'category schema already current'
     }
   }
 
-  const getAllSystemPresets = async () => {
-    const result = []
-    const pageSize = 100
-    let skip = 0
-    while (true) {
-      const res = await db.collection(col)
-        .where({ bookId: null, isSystem: true })
-        .skip(skip)
-        .limit(pageSize)
-        .get()
-      result.push(...res.data)
-      if (res.data.length < pageSize) break
-      skip += pageSize
-    }
-    return result
-  }
+  const existingCategories = await getAll(categories.where({ bookId }))
+  let createdBig = 0
+  let createdChild = 0
+  let taggedExisting = 0
 
-  const existingPresets = await getAllSystemPresets()
-  const bigByKey = new Map()
-  const childrenByParent = new Map()
-
-  existingPresets.forEach(cat => {
-    if (cat.parentId === null) {
-      bigByKey.set(`${cat.type}:${cat.name}`, cat)
-      return
-    }
-    if (!childrenByParent.has(cat.parentId)) {
-      childrenByParent.set(cat.parentId, new Set())
-    }
-    childrenByParent.get(cat.parentId).add(cat.name)
-  })
-
-  let updated = 0, created = 0, childrenCreated = 0
-
-  const parentResults = await Promise.all(targetPresets.map(async (preset) => {
-    const key = `${preset.type}:${preset.name}`
-    const existing = bigByKey.get(key)
-
+  const resolvedParents = await Promise.all(ALL_PRESETS.map(async preset => {
+    const existing = findBigCategory(existingCategories, preset)
     if (existing) {
-      await db.collection(col).doc(existing._id).update({
-        data: { icon: preset.icon, order: preset.order }
-      })
-      updated++
-      return { preset, parentId: existing._id, existingChildren: childrenByParent.get(existing._id) || new Set() }
+      if (existing.presetKey !== preset.key) {
+        await categories.doc(existing._id).update({
+          data: {
+            presetKey: preset.key,
+            type: preset.type,
+            order: preset.order,
+            isSystem: true
+          }
+        })
+        existing.presetKey = preset.key
+        taggedExisting++
+      }
+      return { preset, parentId: existing._id }
     }
 
-    const { _id: parentId } = await db.collection(col).add({
+    const { _id: parentId } = await categories.add({
       data: {
-        name: preset.name, icon: preset.icon, order: preset.order,
-        type: preset.type, isVisible: true, isSystem: true,
-        parentId: null, bookId: null
+        presetKey: preset.key,
+        name: preset.name,
+        icon: preset.icon,
+        order: preset.order,
+        type: preset.type,
+        isVisible: true,
+        isSystem: true,
+        parentId: null,
+        bookId
       }
     })
-    created++
-    return { preset, parentId, existingChildren: new Set() }
+    existingCategories.push({
+      _id: parentId,
+      presetKey: preset.key,
+      name: preset.name,
+      icon: preset.icon,
+      order: preset.order,
+      type: preset.type,
+      isVisible: true,
+      isSystem: true,
+      parentId: null,
+      bookId
+    })
+    createdBig++
+    return { preset, parentId }
   }))
 
-  const childCreates = []
-  parentResults.forEach(({ preset, parentId, existingChildren }) => {
-    preset.children.forEach(childName => {
-      if (existingChildren.has(childName)) return
-      childCreates.push(db.collection(col).add({
+  const childWrites = []
+  for (const { preset, parentId } of resolvedParents) {
+    preset.children.forEach((childName, index) => {
+      const presetKey = childPresetKey(preset.key, index)
+      const existing = findChildCategory(existingCategories, parentId, presetKey, childName)
+      if (existing) {
+        if (existing.presetKey !== presetKey) {
+          childWrites.push(categories.doc(existing._id).update({
+            data: {
+              presetKey,
+              type: preset.type,
+              isSystem: true
+            }
+          }))
+          taggedExisting++
+        }
+        return
+      }
+
+      childWrites.push(categories.add({
         data: {
-          name: childName, icon: '', order: 0,
-          type: preset.type, isVisible: true, isSystem: true,
-          parentId, bookId: null
+          presetKey,
+          name: childName,
+          icon: '',
+          order: index + 1,
+          type: preset.type,
+          isVisible: true,
+          isSystem: true,
+          parentId,
+          bookId
         }
       }))
-      childrenCreated++
+      createdChild++
     })
+  }
+  await Promise.all(childWrites)
+
+  // 只有全部分类写入成功后才推进版本；中断时下次登录会继续补齐。
+  await books.doc(bookId).update({
+    data: {
+      categorySchemaVersion: CATEGORY_SCHEMA_VERSION,
+      updatedAt: db.serverDate()
+    }
   })
 
-  await Promise.all(childCreates)
+  return {
+    success: true,
+    categorySchemaVersion: CATEGORY_SCHEMA_VERSION,
+    createdBig,
+    createdChild,
+    taggedExisting
+  }
+}
+
+async function updateSystemPresets(event) {
+  const collectionName = name => getCollectionName(event, name)
+  const categories = db.collection(collectionName('categories'))
+  const batchStart = Number.isInteger(event.batchStart) ? event.batchStart : 0
+  const batchSize = Number.isInteger(event.batchSize) && event.batchSize > 0 ? event.batchSize : null
+  const targetPresets = batchSize ? ALL_PRESETS.slice(batchStart, batchStart + batchSize) : ALL_PRESETS
+  const existingCategories = await getAll(categories.where({ bookId: null }))
+  let updated = 0
+  let created = 0
+  let childrenCreated = 0
+
+  for (const preset of targetPresets) {
+    let parent = findBigCategory(existingCategories, preset)
+    if (!parent) {
+      const { _id } = await categories.add({
+        data: {
+          presetKey: preset.key,
+          name: preset.name,
+          icon: preset.icon,
+          order: preset.order,
+          type: preset.type,
+          isVisible: true,
+          isSystem: true,
+          parentId: null,
+          bookId: null
+        }
+      })
+      parent = { _id, ...preset, presetKey: preset.key, parentId: null, bookId: null, isSystem: true }
+      existingCategories.push(parent)
+      created++
+    } else {
+      await categories.doc(parent._id).update({
+        data: {
+          presetKey: preset.key,
+          icon: preset.icon,
+          order: preset.order,
+          type: preset.type,
+          isSystem: true
+        }
+      })
+      updated++
+    }
+
+    for (let index = 0; index < preset.children.length; index++) {
+      const childName = preset.children[index]
+      const presetKey = childPresetKey(preset.key, index)
+      const child = findChildCategory(existingCategories, parent._id, presetKey, childName)
+      if (!child) {
+        const { _id } = await categories.add({
+          data: {
+            presetKey,
+            name: childName,
+            icon: '',
+            order: index + 1,
+            type: preset.type,
+            isVisible: true,
+            isSystem: true,
+            parentId: parent._id,
+            bookId: null
+          }
+        })
+        existingCategories.push({
+          _id,
+          presetKey,
+          name: childName,
+          parentId: parent._id,
+          type: preset.type,
+          isSystem: true,
+          bookId: null
+        })
+        childrenCreated++
+      }
+    }
+  }
 
   return {
     success: true,
@@ -287,9 +238,30 @@ exports.updateSystemPresets = async (event) => {
     created,
     childrenCreated,
     batchStart,
-    batchSize: batchSize || allPresets.length,
+    batchSize: batchSize || ALL_PRESETS.length,
     processed: targetPresets.length,
-    done: !batchSize || batchStart + batchSize >= allPresets.length,
-    total: allPresets.length
+    done: !batchSize || batchStart + batchSize >= ALL_PRESETS.length,
+    total: ALL_PRESETS.length
   }
 }
+
+exports.main = async (event) => {
+  const { bookId, action } = event
+
+  try {
+    if (action === 'updateSystemPresets') {
+      return await updateSystemPresets(event)
+    }
+    if (!bookId) {
+      return { success: false, error: 'bookId is required for init-database' }
+    }
+    return await ensureBookPresets(event, bookId)
+  } catch (err) {
+    console.error('init-database error:', err)
+    return { success: false, error: err.message }
+  }
+}
+
+exports.ensureBookPresets = ensureBookPresets
+exports.updateSystemPresets = updateSystemPresets
+exports.getCollectionName = getCollectionName

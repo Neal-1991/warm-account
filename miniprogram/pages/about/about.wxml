@@ -4,7 +4,7 @@
     <text class="app-name">暖账</text>
   </view>
 
-  <view class="version">版本 1.0.0</view>
+  <view class="version">版本 {{appVersion}}</view>
 
   <view class="links">
     <view class="link-item" bindtap="openTerms">

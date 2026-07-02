@@ -1,4 +1,9 @@
 const config = require('../../utils/config')
+const {
+  COMMON_EMOJIS,
+  emojiFromIndex,
+  emojiFromInput
+} = require('../../utils/category-emoji')
 
 Component({
   properties: {
@@ -17,7 +22,8 @@ Component({
     showAddBig: false,
     newChildName: '',
     newBigName: '',
-    newBigIcon: '📌'
+    newBigIcon: '📌',
+    commonEmojis: COMMON_EMOJIS
   },
   lifetimes: {
     attached() {
@@ -138,8 +144,13 @@ Component({
     onAddBigNameInput(e) {
       this.setData({ newBigName: e.detail.value })
     },
+    onSelectAddBigEmoji(e) {
+      const newBigIcon = emojiFromIndex(this.data.commonEmojis, e)
+      console.log('select quick add-big emoji:', newBigIcon)
+      this.setData({ newBigIcon })
+    },
     onAddBigIconInput(e) {
-      this.setData({ newBigIcon: e.detail.value || '📌' })
+      this.setData({ newBigIcon: emojiFromInput(e) })
     },
     confirmAddBig() {
       const name = this.data.newBigName.trim()
