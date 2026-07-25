@@ -86,7 +86,7 @@
               <text class="drawer-record-creator">{{item.createdByName}}</text>
             </view>
           </view>
-          <view class="drawer-record-amount">-¥{{item.amount}}</view>
+          <view class="drawer-record-amount">[V2]-¥{{item.amount}}</view>
         </view>
       </block>
       <view wx:if="{{activeBigRecords.length === 0}}" class="drawer-empty">
