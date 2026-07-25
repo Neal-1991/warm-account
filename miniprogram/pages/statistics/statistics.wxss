@@ -315,11 +315,11 @@
   font-size: 30rpx;
   font-weight: 500;
   color: var(--theme-text, #333);
-  flex-shrink: 0;
+  flex: 0 0 240rpx;
   white-space: nowrap;
   margin-left: 16rpx;
-  min-width: 200rpx;
   text-align: right;
+  box-sizing: border-box;
 }
 
 .drawer-empty {
