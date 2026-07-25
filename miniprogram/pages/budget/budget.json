@@ -1,6 +1,7 @@
 {
   "usingComponents": {
-    "month-selector": "/components/month-selector/month-selector"
+    "month-selector": "/components/month-selector/month-selector",
+    "category-icon": "/components/category-icon/category-icon"
   },
   "navigationBarTitleText": "预算管理"
 }

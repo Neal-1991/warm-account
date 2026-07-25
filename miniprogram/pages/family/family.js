@@ -20,12 +20,15 @@ Page({
     pendingInviteCode: '',
     pendingTargetBookId: '',
     joining: false,
-    joinProgressText: ''
+    joinProgressText: '',
+    themeStyle: ''
   },
 
   async onLoad(options) {
     this._unloaded = false
     const app = getApp()
+    this.setData({ themeStyle: app.getThemeStyle() })
+    app.applyTheme()
     const session = await app.ensureSession()
     const openId = session.openId || app.getOpenId()
     this.setData({ currentOpenId: openId || '' })
@@ -44,6 +47,8 @@ Page({
 
   async onShow() {
     const app = getApp()
+    this.setData({ themeStyle: app.getThemeStyle() })
+    app.applyTheme()
     const session = await app.ensureSession()
     const openId = session.openId || app.getOpenId()
     this.setData({ currentOpenId: openId || '' })

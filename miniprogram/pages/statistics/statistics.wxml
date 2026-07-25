@@ -1,4 +1,4 @@
-<view class="container">
+<view class="container" style="{{themeStyle}}">
   <view class="header">
     <month-selector month="{{currentMonth}}" bindchange="onMonthChange" />
   </view>
@@ -25,9 +25,12 @@
 
   <view class="legend">
     <block wx:for="{{legend}}" wx:key="name">
-      <view class="legend-item">
+      <view class="legend-item" bindtap="onLegendTap" data-name="{{item.name}}">
         <view class="legend-main">
           <view class="color-dot" style="background: {{item.color}};"></view>
+          <view class="legend-icon">
+            <category-icon icon-info="{{item.iconInfo}}" emoji="{{item.icon}}" size="small" />
+          </view>
           <text class="name">{{item.name}}</text>
           <text class="amount">¥{{item.amount}}</text>
           <text class="percent">{{item.percent}}%</text>
@@ -52,5 +55,40 @@
     <view wx:if="{{legend.length === 0}}" class="empty">
       <text>本月暂无支出数据</text>
     </view>
+  </view>
+
+  <!-- 大类明细抽屉 -->
+  <view wx:if="{{showDetailDrawer}}" class="drawer-mask" bindtap="closeDetailDrawer"></view>
+  <view class="drawer {{showDetailDrawer ? 'open' : ''}}">
+    <view class="drawer-header">
+      <view class="drawer-title">
+        <category-icon wx:if="{{activeBigIconInfo}}" icon-info="{{activeBigIconInfo}}" size="small" />
+        <text class="drawer-name">{{activeBigName}}</text>
+      </view>
+      <view class="drawer-meta">
+        <text class="drawer-count">{{activeBigCount}} 笔</text>
+        <text class="drawer-amount">¥{{activeBigAmount}}</text>
+      </view>
+      <view class="drawer-close" bindtap="closeDetailDrawer">✕</view>
+    </view>
+    <scroll-view scroll-y class="drawer-body">
+      <block wx:for="{{activeBigRecords}}" wx:key="_id">
+        <view class="drawer-record" bindtap="onRecordTap" data-record-id="{{item._id}}">
+          <category-icon icon-info="{{item.iconInfo}}" emoji="{{item.icon}}" size="normal" />
+          <view class="drawer-record-info">
+            <view class="drawer-record-category">{{item.categoryName}}</view>
+            <view class="drawer-record-remark" wx:if="{{item.remark}}">{{item.remark}}</view>
+            <view class="drawer-record-meta">
+              <text wx:if="{{item.dateStr}}" class="drawer-record-date">{{item.dateStr}}</text>
+              <text class="drawer-record-creator">{{item.createdByName}}</text>
+            </view>
+          </view>
+          <view class="drawer-record-amount">-¥{{item.amount}}</view>
+        </view>
+      </block>
+      <view wx:if="{{activeBigRecords.length === 0}}" class="drawer-empty">
+        <text>本月该大类暂无支出记录</text>
+      </view>
+    </scroll-view>
   </view>
 </view>

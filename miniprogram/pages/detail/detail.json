@@ -1,4 +1,6 @@
 {
   "navigationBarTitleText": "记录详情",
-  "usingComponents": {}
+  "usingComponents": {
+    "category-icon": "/components/category-icon/category-icon"
+  }
 }

@@ -11,7 +11,7 @@ const {
 } = require('../../utils/homepage-records')
 
 const EMPTY_SUMMARY = { expense: '0.00', income: '0.00', balance: '0.00' }
-const EMPTY_BUDGET_VIEW = { configured: false, canEdit: false, isHistorical: false }
+const EMPTY_BUDGET_VIEW = { configured: false, canEdit: false, isHistorical: false, loading: false }
 
 function currentMonthValue(now = new Date()) {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
@@ -22,6 +22,16 @@ function monthDisplay(month) {
   return `${year}年${monthNum}月`
 }
 
+function budgetLoadingView(month) {
+  return {
+    configured: false,
+    canEdit: false,
+    isHistorical: month < currentMonthValue(),
+    loading: true,
+    month
+  }
+}
+
 Page({
   data: {
     currentMonth: '',
@@ -29,7 +39,8 @@ Page({
     summary: EMPTY_SUMMARY,
     records: [],
     recordGroups: [],
-    budgetView: EMPTY_BUDGET_VIEW
+    budgetView: EMPTY_BUDGET_VIEW,
+    themeStyle: ''
   },
 
   onLoad() {
@@ -38,12 +49,17 @@ Page({
     this._skipNextShow = true
     this.setData({
       currentMonth: month,
-      currentMonthDisplay: monthDisplay(month)
+      currentMonthDisplay: monthDisplay(month),
+      budgetView: budgetLoadingView(month),
+      themeStyle: getApp().getThemeStyle()
     })
+    getApp().applyTheme()
     this.loadData()
   },
 
   onShow() {
+    this.setData({ themeStyle: getApp().getThemeStyle() })
+    getApp().applyTheme()
     if (this._skipNextShow) {
       this._skipNextShow = false
       return
@@ -56,7 +72,7 @@ Page({
     this.setData({
       currentMonth: month,
       currentMonthDisplay: monthDisplay(month),
-      budgetView: EMPTY_BUDGET_VIEW
+      budgetView: budgetLoadingView(month)
     })
     this.loadData()
   },
@@ -140,7 +156,12 @@ Page({
       return
     }
 
-    this.setData({ budgetView: EMPTY_BUDGET_VIEW })
+    const cachedBudgetView = app.getBudgetViewCache(bookId, month)
+    if (cachedBudgetView) {
+      this.setData({ budgetView: cachedBudgetView })
+    } else if (this.data.budgetView.month !== month || !this.data.budgetView.configured) {
+      this.setData({ budgetView: budgetLoadingView(month) })
+    }
 
     const categoryPromise = wx.cloud.callFunction({
       name: 'category',
@@ -166,12 +187,28 @@ Page({
       }
     }).then(budgetRes => {
       if (!this.isCurrentLoad(loadSeq, month)) return
+      const budgetView = {
+        ...buildBudgetView(budgetRes.result, month),
+        month,
+        loading: false,
+        error: false
+      }
+      app.setBudgetViewCache(bookId, month, budgetView)
       this.setData({
-        budgetView: buildBudgetView(budgetRes.result, month)
+        budgetView
       })
     }).catch(error => {
       if (!this.isCurrentLoad(loadSeq, month)) return
       console.error('home budget load error:', error)
+      const currentView = this.data.budgetView || budgetLoadingView(month)
+      this.setData({
+        budgetView: {
+          ...currentView,
+          loading: false,
+          error: true,
+          month
+        }
+      })
     })
 
     try {
@@ -205,6 +242,7 @@ Page({
           amountDisplay: (record.amount / 100).toFixed(2),
           dateStr: dateUtil.formatDate(new Date(record.date)),
           icon: catInfo.icon,
+          iconInfo: catInfo.iconInfo,
           categoryName: catInfo.name,
           remark: record.remark || '',
           hasImages: (record.images || []).length > 0

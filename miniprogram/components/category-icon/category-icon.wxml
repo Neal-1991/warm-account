@@ -1,0 +1,9 @@
+<view class="category-icon {{size}} {{selected ? 'selected' : ''}}">
+  <image
+    wx:if="{{iconInfo && iconInfo.assetPath}}"
+    class="category-icon-image"
+    src="{{iconInfo.assetPath}}"
+    mode="aspectFit"
+  />
+  <text wx:else class="category-icon-emoji">{{(iconInfo && iconInfo.emoji) || emoji || '📌'}}</text>
+</view>

@@ -1,9 +1,10 @@
-<view class="container">
+<view class="container" style="{{themeStyle}}">
   <view class="header">
     <month-selector month="{{currentMonth}}" bindchange="onMonthChange" />
   </view>
 
   <summary-card
+    theme-style="{{themeStyle}}"
     month="{{currentMonthDisplay}}"
     expenseAmount="{{summary.expense}}"
     incomeAmount="{{summary.income}}"
@@ -33,6 +34,18 @@
         <text>预算 ¥{{budgetView.limitAmount}}</text>
       </view>
       <view wx:if="{{budgetView.paceText}}" class="budget-pace">{{budgetView.paceText}}</view>
+    </view>
+
+    <view wx:elif="{{budgetView.loading}}" class="budget-empty">
+      <view class="budget-empty-icon">...</view>
+      <text class="budget-empty-title">预算加载中</text>
+      <text class="budget-empty-note">账目会先展示，预算稍后刷新</text>
+    </view>
+
+    <view wx:elif="{{budgetView.error}}" class="budget-empty">
+      <view class="budget-empty-icon">!</view>
+      <text class="budget-empty-title">预算刷新失败</text>
+      <text class="budget-empty-note">账目与收支统计仍会正常展示</text>
     </view>
 
     <view wx:else class="budget-empty">
@@ -67,6 +80,8 @@
           <view bindtap="onRecordTap" data-record-id="{{record._id}}">
             <record-card
               icon="{{record.icon}}"
+              icon-info="{{record.iconInfo}}"
+              theme-style="{{themeStyle}}"
               categoryName="{{record.categoryName}}"
               remark="{{record.remark}}"
               type="{{record.type}}"

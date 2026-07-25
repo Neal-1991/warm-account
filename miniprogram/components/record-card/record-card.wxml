@@ -1,5 +1,5 @@
-<view class="record-card">
-  <view class="icon">{{icon}}</view>
+<view class="record-card" style="{{themeStyle}}">
+  <category-icon icon-info="{{iconInfo}}" emoji="{{icon}}" size="normal" />
   <view class="info">
     <view class="category">
       {{categoryName}}

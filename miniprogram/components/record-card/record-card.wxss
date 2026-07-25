@@ -1,25 +1,21 @@
 .record-card {
   display: flex;
   align-items: center;
-  background: #FFFFFF;
+  background: var(--theme-surface, #FFFFFF);
   margin: 15rpx 30rpx;
   padding: 25rpx;
   border-radius: 12rpx;
   box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.05);
 }
 
-.icon {
-  font-size: 48rpx;
-  margin-right: 20rpx;
-}
-
 .info {
   flex: 1;
+  margin-left: 20rpx;
 }
 
 .category {
   font-size: 30rpx;
-  color: #333;
+  color: var(--theme-text, #333);
   font-weight: 500;
 }
 
@@ -30,7 +26,7 @@
 
 .remark {
   font-size: 24rpx;
-  color: #999;
+  color: var(--theme-muted, #999);
   margin-top: 8rpx;
 }
 
@@ -44,11 +40,11 @@
 }
 
 .amount.expense {
-  color: #FF6B00;
+  color: var(--color-expense, #D96F3D);
 }
 
 .amount.income {
-  color: #4CAF50;
+  color: var(--color-income, #2F8F9D);
 }
 
 .meta {
@@ -59,12 +55,12 @@
 
 .date {
   font-size: 22rpx;
-  color: #999;
+  color: var(--theme-muted, #999);
 }
 
 .creator {
   font-size: 22rpx;
-  color: #CCC;
+  color: var(--theme-muted, #CCC);
   margin-top: 8rpx;
 }
 

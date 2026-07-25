@@ -1,4 +1,6 @@
 {
-  "usingComponents": {},
+  "usingComponents": {
+    "category-icon": "/components/category-icon/category-icon"
+  },
   "navigationBarTitleText": "分类管理"
 }

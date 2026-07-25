@@ -1,10 +1,10 @@
 .container {
   min-height: 100vh;
-  background: #f5f5f5;
+  background: var(--theme-bg, #f5f5f5);
 }
 
 .family-info {
-  background: #FFFFFF;
+  background: var(--theme-surface, #FFFFFF);
   padding: 40rpx 30rpx;
   margin-bottom: 20rpx;
 }
@@ -12,7 +12,7 @@
 .family-name {
   font-size: 40rpx;
   font-weight: bold;
-  color: #333;
+  color: var(--theme-text, #333);
   display: block;
   margin-bottom: 30rpx;
 }
@@ -30,20 +30,20 @@
 
 .invite-code-label {
   font-size: 28rpx;
-  color: #999;
+  color: var(--theme-muted, #999);
 }
 
 .invite-code-value {
   font-size: 36rpx;
-  color: #FF9500;
+  color: var(--theme-accent, #FF9500);
   font-weight: bold;
   margin-right: 12rpx;
 }
 
 .invite-code-tip {
   font-size: 22rpx;
-  color: #ccc;
-  background: #f5f5f5;
+  color: var(--theme-muted, #ccc);
+  background: var(--theme-bg, #f5f5f5);
   padding: 4rpx 12rpx;
   border-radius: 8rpx;
 }
@@ -52,7 +52,7 @@
   width: 100%;
   height: 80rpx;
   line-height: 80rpx;
-  background: #FF9500;
+  background: var(--theme-accent, #FF9500);
   color: #FFF;
   border-radius: 40rpx;
   font-size: 30rpx;
@@ -67,14 +67,14 @@
 /* ==================== 成员列表 ==================== */
 
 .member-section {
-  background: #FFFFFF;
+  background: var(--theme-surface, #FFFFFF);
   padding: 30rpx;
   margin-bottom: 20rpx;
 }
 
 .section-title {
   font-size: 30rpx;
-  color: #999;
+  color: var(--theme-muted, #999);
   margin-bottom: 20rpx;
   display: block;
 }
@@ -88,7 +88,7 @@
   display: flex;
   align-items: center;
   padding: 20rpx 0;
-  border-bottom: 1px solid #F0F0F0;
+  border-bottom: 1px solid var(--theme-border, #F0F0F0);
 }
 
 .member-item:last-child {
@@ -111,18 +111,18 @@
 
 .member-name {
   font-size: 30rpx;
-  color: #333;
+  color: var(--theme-text, #333);
 }
 
 .member-role {
   font-size: 24rpx;
-  color: #999;
+  color: var(--theme-muted, #999);
   margin-top: 4rpx;
 }
 
 .remove-btn {
   font-size: 26rpx;
-  color: #FF6B00;
+  color: var(--color-danger, #FF6B00);
 }
 
 /* ==================== 弹窗 ==================== */
@@ -142,7 +142,7 @@
 
 .dialog-card {
   width: 560rpx;
-  background: #FFFFFF;
+  background: var(--theme-surface, #FFFFFF);
   border-radius: 20rpx;
   overflow: hidden;
 }
@@ -155,7 +155,7 @@
 .dialog-title {
   font-size: 36rpx;
   font-weight: bold;
-  color: #333;
+  color: var(--theme-text, #333);
   display: block;
   margin-bottom: 16rpx;
   line-height: 1.4;
@@ -163,7 +163,7 @@
 
 .dialog-desc {
   font-size: 26rpx;
-  color: #999;
+  color: var(--theme-muted, #999);
   display: block;
   line-height: 1.5;
 }
@@ -172,13 +172,13 @@
   display: block;
   margin-top: 20rpx;
   font-size: 24rpx;
-  color: #FF9500;
+  color: var(--theme-accent, #FF9500);
   line-height: 1.5;
 }
 
 .dialog-actions {
   display: flex;
-  border-top: 1px solid #F0F0F0;
+  border-top: 1px solid var(--theme-border, #F0F0F0);
 }
 
 .dialog-actions-single {
@@ -198,12 +198,12 @@
 }
 
 .dialog-btn-cancel {
-  color: #999;
-  border-right: 1px solid #F0F0F0;
+  color: var(--theme-muted, #999);
+  border-right: 1px solid var(--theme-border, #F0F0F0);
 }
 
 .dialog-btn-confirm {
-  color: #FF9500;
+  color: var(--theme-accent, #FF9500);
   font-weight: bold;
 }
 

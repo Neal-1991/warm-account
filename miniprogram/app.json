@@ -13,18 +13,18 @@
   ],
   "tabBar": {
     "color": "#999999",
-    "selectedColor": "#FF9500",
+    "selectedColor": "#6F8F4E",
     "backgroundColor": "#FFFFFF",
     "list": [
-      { "pagePath": "pages/index/index", "text": "首页", "iconPath": "images/home.png", "selectedIconPath": "images/home-active.png" },
-      { "pagePath": "pages/statistics/statistics", "text": "统计", "iconPath": "images/stat.png", "selectedIconPath": "images/stat-active.png" },
-      { "pagePath": "pages/mine/mine", "text": "我的", "iconPath": "images/mine.png", "selectedIconPath": "images/mine-active.png" }
+      { "pagePath": "pages/index/index", "text": "首页", "iconPath": "images/tabbar/home.png", "selectedIconPath": "images/tabbar/avocado/home-active.png" },
+      { "pagePath": "pages/statistics/statistics", "text": "统计", "iconPath": "images/tabbar/stat.png", "selectedIconPath": "images/tabbar/avocado/stat-active.png" },
+      { "pagePath": "pages/mine/mine", "text": "我的", "iconPath": "images/tabbar/mine.png", "selectedIconPath": "images/tabbar/avocado/mine-active.png" }
     ]
   },
   "lazyCodeLoading": "requiredComponents",
   "window": {
     "backgroundTextStyle": "light",
-    "navigationBarBackgroundColor": "#FF9500",
+    "navigationBarBackgroundColor": "#6F8F4E",
     "navigationBarTitleText": "暖账",
     "navigationBarTextStyle": "white"
   }

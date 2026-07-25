@@ -40,6 +40,13 @@ const {
   resolveCategoryDisplay,
   aggregateByParent
 } = require('../miniprogram/utils/category-display')
+const {
+  DEFAULT_ICON_KEY,
+  iconForCategory,
+  iconOptions,
+  normalizeIconKey,
+  recommendIconKey
+} = require('../miniprogram/utils/category-icons')
 
 test('current category schema contains 16 expense and 7 income presets', () => {
   assert.equal(CATEGORY_SCHEMA_VERSION, 1)
@@ -118,6 +125,61 @@ test('add-big emoji uses separate candidate and input event paths', () => {
   }), '☕')
 })
 
+test('semantic category icons resolve legacy keys and preset bindings', () => {
+  assert.equal(normalizeIconKey('expense_food'), 'icon_bowl_chopsticks')
+  assert.equal(normalizeIconKey('income_bonus'), 'icon_award_money')
+  assert.equal(normalizeIconKey('category_default'), DEFAULT_ICON_KEY)
+  assert.equal(
+    iconForCategory({ presetKey: 'income_bonus' }).assetPath,
+    '/images/category-icons/icon_award_money.png'
+  )
+  assert.equal(
+    iconForCategory({ iconKey: 'expense_transport' }).iconKey,
+    'icon_vehicle'
+  )
+  assert.equal(iconForCategory({ icon: '♻️' }).iconKey, 'icon_recycle_money')
+  assert.equal(iconForCategory({ icon: '🧾' }).iconKey, 'icon_receipt_return')
+  assert.equal(iconForCategory({ icon: '🚉' }).iconKey, 'icon_vehicle')
+  assert.equal(iconForCategory({}).iconKey, DEFAULT_ICON_KEY)
+})
+
+test('production custom categories prefer semantic name matches before emoji fallback', () => {
+  assert.equal(
+    iconForCategory({ name: '医保报销', type: 'income', icon: '💊' }).iconKey,
+    'icon_receipt_return'
+  )
+  assert.equal(
+    iconForCategory({ name: '汽车', type: 'expense', icon: '🚗' }).iconKey,
+    'icon_vehicle'
+  )
+})
+
+test('semantic icon recommendation stays within the current category type', () => {
+  assert.equal(recommendIconKey('买菜', 'expense'), 'icon_grocery_bag')
+  assert.equal(recommendIconKey('话费', 'expense'), 'icon_phone_bill')
+  assert.equal(recommendIconKey('医疗', 'expense'), 'icon_medical')
+  assert.equal(recommendIconKey('红包礼金', 'expense'), 'icon_gift_social')
+  assert.equal(recommendIconKey('退款', 'income'), 'icon_wallet_refund')
+  assert.equal(recommendIconKey('报销', 'income'), 'icon_receipt_return')
+  assert.equal(recommendIconKey('红包礼金', 'income'), 'icon_red_packet_money')
+  assert.equal(recommendIconKey('奖金', 'income'), 'icon_award_money')
+  assert.equal(recommendIconKey('废品回收', 'income'), 'icon_recycle_money')
+  assert.equal(recommendIconKey('报销', 'expense'), DEFAULT_ICON_KEY)
+  assert.equal(recommendIconKey('完全未知分类', 'expense'), DEFAULT_ICON_KEY)
+})
+
+test('semantic icon options are scoped by income and expense type', () => {
+  const expenseKeys = iconOptions('expense').map(icon => icon.key)
+  const incomeKeys = iconOptions('income').map(icon => icon.key)
+
+  assert.ok(expenseKeys.includes('icon_cup'))
+  assert.ok(expenseKeys.includes(DEFAULT_ICON_KEY))
+  assert.equal(expenseKeys.includes('icon_salary_card'), false)
+  assert.ok(incomeKeys.includes('icon_receipt_return'))
+  assert.ok(incomeKeys.includes(DEFAULT_ICON_KEY))
+  assert.equal(incomeKeys.includes('icon_grocery_bag'), false)
+})
+
 test('family category merge prefers stable preset keys after a rename', () => {
   const target = {
     _id: 'target-food',
@@ -154,20 +216,39 @@ test('home uses parent icon with child name while statistics aggregate by parent
   ]
   const displayMap = buildCategoryDisplayMap(categories)
 
-  assert.deepEqual(resolveCategoryDisplay(displayMap, 'dinner'), {
+  const dinnerDisplay = resolveCategoryDisplay(displayMap, 'dinner')
+  const springGiftDisplay = resolveCategoryDisplay(displayMap, 'spring-gift')
+
+  assert.deepEqual({
+    name: dinnerDisplay.name,
+    icon: dinnerDisplay.icon,
+    parentName: dinnerDisplay.parentName,
+    valid: dinnerDisplay.valid,
+    isBigCategory: dinnerDisplay.isBigCategory
+  }, {
     name: '晚餐',
     icon: '🍜',
     parentName: '餐饮',
     valid: true,
     isBigCategory: false
   })
-  assert.deepEqual(resolveCategoryDisplay(displayMap, 'spring-gift'), {
+  assert.equal(dinnerDisplay.iconInfo.iconKey, 'icon_bowl_chopsticks')
+  assert.equal(dinnerDisplay.iconInfo.emoji, '')
+  assert.deepEqual({
+    name: springGiftDisplay.name,
+    icon: springGiftDisplay.icon,
+    parentName: springGiftDisplay.parentName,
+    valid: springGiftDisplay.valid,
+    isBigCategory: springGiftDisplay.isBigCategory
+  }, {
     name: '春节红包',
     icon: '🧧',
     parentName: '红包礼金',
     valid: true,
     isBigCategory: false
   })
+  assert.equal(springGiftDisplay.iconInfo.iconKey, 'icon_red_packet_money')
+  assert.equal(springGiftDisplay.iconInfo.emoji, '')
   assert.deepEqual(
     aggregateByParent([
       { categoryId: 'dinner', amount: 3800 },

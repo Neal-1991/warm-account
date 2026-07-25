@@ -5,7 +5,7 @@
   align-items: center;
   justify-content: center;
   height: 100vh;
-  background: linear-gradient(135deg, #FF9500 0%, #FF6B00 100%);
+  background: linear-gradient(135deg, var(--theme-accent, #6F8F4E) 0%, var(--theme-accent-soft, #A8B87A) 100%);
   color: #FFFFFF;
 }
 
@@ -84,7 +84,7 @@
   height: 96rpx;
   line-height: 96rpx;
   background: #FFFFFF;
-  color: #FF9500;
+  color: var(--theme-accent, #6F8F4E);
   font-size: 34rpx;
   font-weight: bold;
   border-radius: 48rpx;

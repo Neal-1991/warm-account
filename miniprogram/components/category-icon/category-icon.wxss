@@ -1,0 +1,46 @@
+.category-icon {
+  width: 72rpx;
+  height: 72rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 24rpx;
+  background: var(--theme-tint, #F7F8F5);
+  border: 1px solid var(--theme-border, #E7ECE4);
+  box-sizing: border-box;
+}
+
+.category-icon.small {
+  width: 52rpx;
+  height: 52rpx;
+  border-radius: 18rpx;
+}
+
+.category-icon.large {
+  width: 92rpx;
+  height: 92rpx;
+  border-radius: 28rpx;
+}
+
+.category-icon.selected {
+  background: var(--theme-tint, #F1F5EA);
+  border-color: var(--theme-accent-soft, #A8B87A);
+}
+
+.category-icon-image {
+  width: 70%;
+  height: 70%;
+}
+
+.category-icon-emoji {
+  font-size: 38rpx;
+  line-height: 1;
+}
+
+.category-icon.small .category-icon-emoji {
+  font-size: 30rpx;
+}
+
+.category-icon.large .category-icon-emoji {
+  font-size: 48rpx;
+}

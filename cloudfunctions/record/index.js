@@ -5,6 +5,14 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const db = cloud.database()
 const _ = db.command
 const PAGE_SIZE = 100
+const VALID_RECORD_TYPES = new Set(['expense', 'income'])
+const SECURITY_SCENE = 2
+const SECURITY_VERSION = 2
+const SECURITY_TIMEOUT_MS = 8000
+const CONTENT_SECURITY_REJECTED = 'CONTENT_SECURITY_REJECTED'
+const CONTENT_SECURITY_UNAVAILABLE = 'CONTENT_SECURITY_UNAVAILABLE'
+const CONTENT_SECURITY_REJECTED_MESSAGE = '内容含违规信息，请修改后再试'
+const CONTENT_SECURITY_UNAVAILABLE_MESSAGE = '内容安全检测暂不可用，请稍后再试'
 
 const getCollectionName = (event, name) => {
   const suffix = event.isTest !== undefined ? (event.isTest ? '_test' : '_prod') : '_test'
@@ -16,6 +24,155 @@ exports.main = async (event, context) => {
   const collectionName = (name) => getCollectionName(event, name)
   const wxContext = cloud.getWXContext()
   const openId = wxContext.OPENID
+
+  const createContentSecurityError = (errorCode, message) => {
+    const err = new Error(message)
+    err.errorCode = errorCode
+    return err
+  }
+
+  const contentSecurityRejected = () => (
+    createContentSecurityError(CONTENT_SECURITY_REJECTED, CONTENT_SECURITY_REJECTED_MESSAGE)
+  )
+
+  const contentSecurityUnavailable = () => (
+    createContentSecurityError(CONTENT_SECURITY_UNAVAILABLE, CONTENT_SECURITY_UNAVAILABLE_MESSAGE)
+  )
+
+  const isContentSecurityError = err => (
+    err && (err.errorCode === CONTENT_SECURITY_REJECTED || err.errorCode === CONTENT_SECURITY_UNAVAILABLE)
+  )
+
+  const withSecurityTimeout = (promise) => new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(createContentSecurityError(
+        CONTENT_SECURITY_UNAVAILABLE,
+        CONTENT_SECURITY_UNAVAILABLE_MESSAGE
+      ))
+    }, SECURITY_TIMEOUT_MS)
+    promise.then(res => {
+      clearTimeout(timer)
+      resolve(res)
+    }).catch(err => {
+      clearTimeout(timer)
+      reject(err)
+    })
+  })
+
+  const securityDetail = (res = {}) => {
+    const result = res.result || {}
+    return {
+      errCode: res.errCode ?? res.errcode ?? result.errCode ?? result.errcode,
+      suggest: result.suggest || res.suggest || '',
+      traceId: result.traceId || result.trace_id || res.traceId || res.trace_id || ''
+    }
+  }
+
+  const logSecurityResult = (scope, detail, errorCode) => {
+    console.warn('content security check failed:', {
+      action,
+      scope,
+      errorCode,
+      errCode: detail?.errCode,
+      suggest: detail?.suggest,
+      traceId: detail?.traceId
+    })
+  }
+
+  const isRejectedErrCode = errCode => Number(errCode) === 87014
+
+  const assertSecurityPassed = (res, scope) => {
+    const detail = securityDetail(res)
+    if (detail.suggest && detail.suggest !== 'pass') {
+      logSecurityResult(scope, detail, CONTENT_SECURITY_REJECTED)
+      throw contentSecurityRejected()
+    }
+    if (detail.errCode !== undefined && Number(detail.errCode) !== 0) {
+      if (isRejectedErrCode(detail.errCode)) {
+        logSecurityResult(scope, detail, CONTENT_SECURITY_REJECTED)
+        throw contentSecurityRejected()
+      }
+      logSecurityResult(scope, detail, CONTENT_SECURITY_UNAVAILABLE)
+      throw contentSecurityUnavailable()
+    }
+  }
+
+  const normalizeSecurityError = (err, scope) => {
+    if (isContentSecurityError(err)) {
+      throw err
+    }
+    const detail = securityDetail(err || {})
+    if (isRejectedErrCode(detail.errCode || err?.errCode || err?.errcode || err?.code)) {
+      logSecurityResult(scope, detail, CONTENT_SECURITY_REJECTED)
+      throw contentSecurityRejected()
+    }
+    logSecurityResult(scope, detail, CONTENT_SECURITY_UNAVAILABLE)
+    throw contentSecurityUnavailable()
+  }
+
+  const assertTextContentSafe = async (content, scope) => {
+    const text = typeof content === 'string' ? content.trim() : ''
+    if (!text) return
+    const api = cloud.openapi?.security?.msgSecCheck
+    if (typeof api !== 'function') {
+      logSecurityResult(scope, {}, CONTENT_SECURITY_UNAVAILABLE)
+      throw contentSecurityUnavailable()
+    }
+    try {
+      const res = await withSecurityTimeout(api({
+        openid: openId,
+        scene: SECURITY_SCENE,
+        version: SECURITY_VERSION,
+        content: text
+      }))
+      assertSecurityPassed(res, scope)
+    } catch (err) {
+      normalizeSecurityError(err, scope)
+    }
+  }
+
+  const imageContentType = fileId => {
+    const lower = String(fileId || '').toLowerCase()
+    if (lower.includes('.png')) return 'image/png'
+    if (lower.includes('.gif')) return 'image/gif'
+    if (lower.includes('.webp')) return 'image/webp'
+    return 'image/jpeg'
+  }
+
+  const assertImageContentSafe = async (fileId) => {
+    if (typeof fileId !== 'string' || !fileId.startsWith('cloud://')) {
+      logSecurityResult('recordImage', {}, CONTENT_SECURITY_UNAVAILABLE)
+      throw contentSecurityUnavailable()
+    }
+    const api = cloud.openapi?.security?.imgSecCheck
+    if (typeof api !== 'function') {
+      logSecurityResult('recordImage', {}, CONTENT_SECURITY_UNAVAILABLE)
+      throw contentSecurityUnavailable()
+    }
+    try {
+      const file = await withSecurityTimeout(cloud.downloadFile({ fileID: fileId }))
+      if (!file?.fileContent) {
+        logSecurityResult('recordImage', {}, CONTENT_SECURITY_UNAVAILABLE)
+        throw contentSecurityUnavailable()
+      }
+      const res = await withSecurityTimeout(api({
+        media: {
+          contentType: imageContentType(fileId),
+          value: file.fileContent
+        }
+      }))
+      assertSecurityPassed(res, 'recordImage')
+    } catch (err) {
+      normalizeSecurityError(err, 'recordImage')
+    }
+  }
+
+  const assertRecordContentSafe = async ({ remark, images }) => {
+    await Promise.all([
+      assertTextContentSafe(remark, 'recordRemark'),
+      Promise.all((images || []).map(assertImageContentSafe))
+    ])
+  }
 
   const getBook = async (id) => {
     if (!id) return null
@@ -35,15 +192,22 @@ exports.main = async (event, context) => {
     return book
   }
 
-  const assertBookWritable = async (id) => {
-    const book = await assertBookMember(id)
-    if (book.joinTargetBookId) {
+  const assertBookIsWritable = (book) => {
+    if (book.joinTargetBookId || book.joinMigration) {
       throw new Error('账本正在合并，请稍后再试')
     }
     return book
   }
 
+  const assertBookWritable = async (id) => {
+    const book = await assertBookMember(id)
+    return assertBookIsWritable(book)
+  }
+
   const assertCategoryInBook = async (categoryId, targetBookId, type) => {
+    if (!categoryId) {
+      throw new Error('invalid category')
+    }
     const res = await db.collection(collectionName('categories')).doc(categoryId).get()
     const category = res.data
     if (!category || category.bookId !== targetBookId || (type && category.type !== type)) {
@@ -114,23 +278,70 @@ exports.main = async (event, context) => {
     })
   }
 
-  const getAuthorizedRecord = async (allowAdmin = false) => {
+  const assertRecordType = (type) => {
+    if (!VALID_RECORD_TYPES.has(type)) {
+      throw new Error('invalid type')
+    }
+    return type
+  }
+
+  const assertPositiveAmount = (amount) => {
+    if (!Number.isInteger(amount) || amount <= 0) {
+      throw new Error('amount must be a positive integer')
+    }
+    return amount
+  }
+
+  const normalizeRecordDate = (value) => {
+    if (!value) {
+      throw new Error('date is required')
+    }
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) {
+      throw new Error('date is invalid')
+    }
+    return date
+  }
+
+  const normalizeImages = (images) => {
+    if (images === undefined) return undefined
+    if (!Array.isArray(images)) {
+      throw new Error('images must be an array')
+    }
+    if (images.length > 9) {
+      throw new Error('images cannot exceed 9')
+    }
+    if (images.some(item => typeof item !== 'string')) {
+      throw new Error('images must be string file IDs')
+    }
+    return images
+  }
+
+  const canModifyRecord = (record, book) => {
+    return record.createdBy === openId || book.ownerId === openId
+  }
+
+  const getAuthorizedRecord = async ({ requireWritable = false, requireModifier = false } = {}) => {
     if (!recordId) {
       throw new Error('recordId is required')
     }
+    if (!bookId) {
+      throw new Error('bookId is required')
+    }
     const recordRes = await db.collection(collectionName('records')).doc(recordId).get()
     const record = recordRes.data
-    if (!record) {
+    if (!record || record.bookId !== bookId) {
       throw new Error('record not found')
     }
     const book = await assertBookMember(record.bookId)
-    if (allowAdmin && book.ownerId === openId) {
-      return { record, book }
+    if (requireWritable) {
+      assertBookIsWritable(book)
     }
-    if (record.createdBy !== openId) {
+    const canModify = canModifyRecord(record, book)
+    if (requireModifier && !canModify) {
       throw new Error('permission denied')
     }
-    return { record, book }
+    return { record, book, canModify }
   }
 
   try {
@@ -143,14 +354,16 @@ exports.main = async (event, context) => {
         if (!data.type || !data.amount || !data.categoryId || !data.date) {
           return { success: false, error: 'Missing required fields: type, amount, categoryId, date' }
         }
-        if (!Number.isInteger(data.amount) || data.amount <= 0) {
-          return { success: false, error: 'amount must be a positive integer' }
-        }
-        const category = await assertCategoryInBook(data.categoryId, bookId, data.type)
+        const type = assertRecordType(data.type)
+        const amount = assertPositiveAmount(data.amount)
+        const date = normalizeRecordDate(data.date)
+        const images = data.images === undefined ? [] : normalizeImages(data.images)
+        const category = await assertCategoryInBook(data.categoryId, bookId, type)
+        await assertRecordContentSafe({ remark: data.remark || '', images })
         let budgetAlert = null
-        if (data.type === 'expense') {
+        if (type === 'expense') {
           try {
-            budgetAlert = await prepareBudgetAlert(category, data.amount, data.date)
+            budgetAlert = await prepareBudgetAlert(category, amount, date)
           } catch (budgetError) {
             console.error('prepare budget alert failed:', budgetError)
           }
@@ -159,19 +372,26 @@ exports.main = async (event, context) => {
         const { _id } = await db.collection(collectionName('records')).add({
           data: {
             bookId,
-            type: data.type,
-            amount: data.amount,
+            type,
+            amount,
             categoryId: data.categoryId,
-            date: new Date(data.date),
+            date,
             remark: data.remark || '',
-            images: data.images || [],
+            images,
             createdBy: openId,
             createdByName: data.nickName || '未知',
             createdAt: db.serverDate(),
+            updatedBy: openId,
+            updatedByName: data.nickName || '未知',
             updatedAt: db.serverDate()
           }
         })
         return { success: true, recordId: _id, budgetAlert }
+      }
+
+      case 'get': {
+        const { record, canModify } = await getAuthorizedRecord()
+        return { success: true, record, canModify }
       }
 
       case 'list': {
@@ -212,33 +432,39 @@ exports.main = async (event, context) => {
       }
 
       case 'update': {
-        const { record, book } = await getAuthorizedRecord(true)
-        if (book.joinTargetBookId) {
-          throw new Error('账本正在合并，请稍后再试')
-        }
-        const updateData = {}
-        if (data.type !== undefined) updateData.type = data.type
-        if (data.amount !== undefined) updateData.amount = data.amount
-        if (data.categoryId !== undefined) updateData.categoryId = data.categoryId
-        if (data.date !== undefined) updateData.date = new Date(data.date)
-        if (data.remark !== undefined) updateData.remark = data.remark
-        if (data.images !== undefined) updateData.images = data.images
+        const { record } = await getAuthorizedRecord({ requireWritable: true, requireModifier: true })
+        const nextType = data.type !== undefined ? assertRecordType(data.type) : assertRecordType(record.type)
+        const nextAmount = data.amount !== undefined ? assertPositiveAmount(data.amount) : assertPositiveAmount(record.amount)
+        const nextCategoryId = data.categoryId !== undefined ? data.categoryId : record.categoryId
+        await assertCategoryInBook(nextCategoryId, record.bookId, nextType)
+        const nextRemark = data.remark !== undefined ? data.remark : record.remark
+        const nextImages = data.images !== undefined ? normalizeImages(data.images) : normalizeImages(record.images || [])
 
-        if (updateData.categoryId) {
-          await assertCategoryInBook(updateData.categoryId, record.bookId, updateData.type || record.type)
+        const updateData = {}
+        if (data.type !== undefined) updateData.type = nextType
+        if (data.amount !== undefined) updateData.amount = nextAmount
+        if (data.categoryId !== undefined) updateData.categoryId = data.categoryId
+        if (data.date !== undefined) updateData.date = normalizeRecordDate(data.date)
+        if (data.remark !== undefined) updateData.remark = nextRemark
+        if (data.images !== undefined) updateData.images = nextImages
+        if (Object.keys(updateData).length === 0) {
+          return { success: false, error: 'no fields to update' }
         }
+        await assertRecordContentSafe({ remark: nextRemark || '', images: nextImages || [] })
 
         await db.collection(collectionName('records')).doc(recordId).update({
-          data: { ...updateData, updatedAt: db.serverDate() }
+          data: {
+            ...updateData,
+            updatedBy: openId,
+            updatedByName: data.nickName || '',
+            updatedAt: db.serverDate()
+          }
         })
         return { success: true }
       }
 
       case 'delete': {
-        const { book } = await getAuthorizedRecord(true)
-        if (book.joinTargetBookId) {
-          throw new Error('账本正在合并，请稍后再试')
-        }
+        await getAuthorizedRecord({ requireWritable: true, requireModifier: true })
         await db.collection(collectionName('records')).doc(recordId).remove()
         return { success: true }
       }
@@ -272,6 +498,6 @@ exports.main = async (event, context) => {
     }
   } catch (err) {
     console.error('record cloud function error:', err)
-    return { success: false, error: err.message }
+    return { success: false, error: err.message, errorCode: err.errorCode }
   }
 }

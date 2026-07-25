@@ -1,6 +1,6 @@
 // 环境配置
 // TODO: 修改 isTest 为 false 切换到生产环境
-const isTest = false  // true = 测试环境，false = 生产环境
+const isTest = true  // true = 测试环境，false = 生产环境
 
 const envConfig = require('./env')
 

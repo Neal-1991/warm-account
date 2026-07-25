@@ -5,6 +5,7 @@ const {
   buildBudgetView,
   copyBudgetErrorMessage
 } = require('../../utils/budget')
+const { iconForCategory } = require('../../utils/category-icons')
 
 function currentMonth() {
   const now = new Date()
@@ -30,18 +31,28 @@ Page({
     categoryLimits: [],
     availableCategories: [],
     showCategoryModal: false,
-    saving: false
+    saving: false,
+    themeStyle: ''
   },
 
   onLoad(options) {
+    const app = getApp()
     const month = /^\d{4}-(0[1-9]|1[0-2])$/.test(options.month || '')
       ? options.month
       : currentMonth()
     this.setData({
       currentMonth: month,
-      currentMonthDisplay: monthDisplay(month)
+      currentMonthDisplay: monthDisplay(month),
+      themeStyle: app.getThemeStyle()
     })
+    app.applyTheme()
     this.loadData()
+  },
+
+  onShow() {
+    const app = getApp()
+    this.setData({ themeStyle: app.getThemeStyle() })
+    app.applyTheme()
   },
 
   onMonthChange(e) {
@@ -95,6 +106,10 @@ Page({
       }
       const categories = (categoryRes.result?.categories || [])
         .filter(category => category.parentId === null)
+        .map(category => ({
+          ...category,
+          iconInfo: iconForCategory(category)
+        }))
       const budget = budgetResult.budget
       const usageByCategory = new Map(
         (budgetResult.usage?.categoryUsage || []).map(item => [item.categoryId, item])
@@ -106,6 +121,7 @@ Page({
           categoryId: limit.categoryId,
           name: category?.name || limit.name || '已删除分类',
           icon: category?.icon || limit.icon || '📝',
+          iconInfo: category?.iconInfo || iconForCategory(limit, limit.icon || '📝'),
           amount: centsToYuan(limit.amount),
           categoryExists: !!category,
           usedAmount: centsToYuan(usage?.usedAmount || 0),
@@ -177,6 +193,7 @@ Page({
           categoryId: category._id,
           name: category.name,
           icon: category.icon || '📝',
+          iconInfo: category.iconInfo,
           amount: '',
           categoryExists: true
         }
@@ -187,8 +204,21 @@ Page({
 
   removeCategory(e) {
     const index = Number(e.currentTarget.dataset.index)
-    this.setData({
-      categoryLimits: this.data.categoryLimits.filter((_, itemIndex) => itemIndex !== index)
+    const category = this.data.categoryLimits[index]
+    if (!category || !this.data.canEdit) return
+
+    wx.showModal({
+      title: '移除大类预算',
+      content: `将从${this.data.currentMonthDisplay}预算草稿中移除「${category.name}」额度。保存预算后生效，不会删除分类和账目。`,
+      confirmText: '移除',
+      confirmColor: '#F45B55',
+      success: modalResult => {
+        if (!modalResult.confirm) return
+        this.setData({
+          categoryLimits: this.data.categoryLimits.filter((_, itemIndex) => itemIndex !== index)
+        })
+        wx.showToast({ title: '已移除，保存预算后生效', icon: 'none' })
+      }
     })
   },
 
@@ -231,6 +261,7 @@ Page({
       if (!res.result?.success) {
         throw new Error(res.result?.error || '保存失败')
       }
+      app.invalidateBudgetCache(bookId, this.data.currentMonth)
       wx.showToast({ title: '预算已保存', icon: 'success' })
       await this.loadData()
     } catch (error) {
@@ -263,6 +294,7 @@ Page({
         return
       }
       const skipped = res.result.skippedCategoryCount || 0
+      getApp().invalidateBudgetCache(getApp().getBookId(), this.data.currentMonth)
       wx.hideLoading()
       wx.showToast({
         title: skipped > 0 ? `已复制，跳过${skipped}个失效分类` : '已复制上月预算',
@@ -296,6 +328,7 @@ Page({
           if (!res.result?.success) {
             throw new Error(res.result?.error || '删除失败')
           }
+          getApp().invalidateBudgetCache(getApp().getBookId(), this.data.currentMonth)
           wx.showToast({ title: '预算已删除', icon: 'success' })
           await this.loadData()
         } catch (error) {

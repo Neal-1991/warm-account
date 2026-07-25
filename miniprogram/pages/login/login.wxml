@@ -1,5 +1,5 @@
 <!-- miniprogram/pages/login/login.wxml -->
-<view class="container">
+<view class="container" style="{{themeStyle}}">
   <view class="logo-section">
     <image class="logo" src="/images/logo.png" mode="aspectFit" />
     <text class="app-name">暖账</text>
@@ -16,7 +16,7 @@
     <view class="checkbox-row">
       <checkbox-group bindchange="onAgreementChange">
         <label class="checkbox-label">
-          <checkbox value="agreed" color="#FF6B00"/>
+          <checkbox value="agreed" color="{{themeAccent}}"/>
           <text class="checkbox-text">我已阅读并同意以上协议</text>
         </label>
       </checkbox-group>
