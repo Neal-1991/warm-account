@@ -15,7 +15,7 @@
   max-height: 78vh;
   background: var(--theme-surface, #FFFFFF);
   border-radius: 32rpx 32rpx 0 0;
-  padding: 30rpx;
+  padding: 30rpx 30rpx calc(30rpx + env(safe-area-inset-bottom));
   box-sizing: border-box;
 }
 

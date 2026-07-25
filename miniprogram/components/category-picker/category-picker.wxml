@@ -1,5 +1,5 @@
 <view class="picker-mask" bindtap="onClose" catchtouchmove="preventTouchMove" wx:if="{{visible}}" style="{{themeStyle}}">
-  <scroll-view scroll-y class="picker-content" catchtap="stopBubble" style="padding-bottom: calc(30rpx + {{safeAreaBottom}}px)">
+  <scroll-view scroll-y class="picker-content" catchtap="stopBubble">
     <view class="picker-header">
       <text class="title">选择分类</text>
       <text class="manage" bindtap="onManage">管理</text>

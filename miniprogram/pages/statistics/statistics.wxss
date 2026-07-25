@@ -318,6 +318,8 @@
   flex-shrink: 0;
   white-space: nowrap;
   margin-left: 16rpx;
+  min-width: 200rpx;
+  text-align: right;
 }
 
 .drawer-empty {

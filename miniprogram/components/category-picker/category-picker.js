@@ -26,18 +26,10 @@ Component({
     newBigIcon: '',
     newBigIconKey: DEFAULT_ICON_KEY,
     newBigIconTouched: false,
-    iconOptions: iconOptions('expense'),
-    safeAreaBottom: 0
+    iconOptions: iconOptions('expense')
   },
   lifetimes: {
     attached() {
-      try {
-        const sys = wx.getSystemInfoSync()
-        const safeAreaBottom = sys.screenHeight - sys.safeArea.bottom
-        this.setData({ safeAreaBottom: safeAreaBottom > 0 ? safeAreaBottom : 0 })
-      } catch (e) {
-        console.error('get safeArea failed:', e)
-      }
       this.initCategories()
     }
   },
