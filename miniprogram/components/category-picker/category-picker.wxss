@@ -7,7 +7,8 @@
   background: rgba(0, 0, 0, 0.5);
   z-index: 1000;
   display: flex;
-  align-items: flex-end;
+  flex-direction: column;
+  justify-content: flex-end;
 }
 
 .picker-content {
@@ -15,7 +16,7 @@
   max-height: 90vh;
   background: var(--theme-surface, #FFFFFF);
   border-radius: 32rpx 32rpx 0 0;
-  padding: 30rpx 30rpx calc(30rpx + env(safe-area-inset-bottom));
+  padding: 30rpx 30rpx 0;
   box-sizing: border-box;
 }
 
@@ -249,7 +250,8 @@
 }
 
 .picker-footer {
-  margin-top: 30rpx;
+  padding: 20rpx 30rpx calc(20rpx + env(safe-area-inset-bottom));
+  background: var(--theme-surface, #FFFFFF);
   flex-shrink: 0;
 }
 

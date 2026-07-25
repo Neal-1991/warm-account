@@ -67,9 +67,9 @@
         </view>
       </scroll-view>
     </view>
-
-    <view class="picker-footer">
-      <button class="confirm-btn" bindtap="onConfirm">确定[V2]</button>
-    </view>
   </scroll-view>
+
+  <view class="picker-footer">
+    <button class="confirm-btn" bindtap="onConfirm">确定[V2]</button>
+  </view>
 </view>
