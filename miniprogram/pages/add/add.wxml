@@ -60,9 +60,9 @@
   </view>
 
   <!-- 提交按钮 -->
-  <button class="submit-btn" type="default" bindtap="onSubmit" disabled="{{!canSubmit || submitting}}">
+  <view class="submit-btn {{(!canSubmit || submitting) ? 'disabled' : ''}}" bindtap="onSubmit">
     {{submitting ? (isEdit ? '保存中...' : '提交中...') : submitText}}
-  </button>
+  </view>
 
   <!-- 分类选择器 -->
   <category-picker

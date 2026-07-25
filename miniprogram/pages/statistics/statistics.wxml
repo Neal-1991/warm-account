@@ -76,7 +76,10 @@
         <view class="drawer-record" bindtap="onRecordTap" data-record-id="{{item._id}}">
           <category-icon icon-info="{{item.iconInfo}}" emoji="{{item.icon}}" size="normal" />
           <view class="drawer-record-info">
-            <view class="drawer-record-category">{{item.categoryName}}</view>
+            <view class="drawer-record-category">
+              {{item.categoryName}}
+              <text wx:if="{{item.hasImages}}" class="drawer-record-images">📷</text>
+            </view>
             <view class="drawer-record-remark" wx:if="{{item.remark}}">{{item.remark}}</view>
             <view class="drawer-record-meta">
               <text wx:if="{{item.dateStr}}" class="drawer-record-date">{{item.dateStr}}</text>

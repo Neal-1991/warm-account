@@ -147,10 +147,13 @@
   border-radius: 44rpx;
   font-size: 32rpx;
   font-weight: bold;
+  box-sizing: border-box;
+  text-align: center;
 }
 
-.submit-btn[disabled] {
+.submit-btn.disabled {
   background: #CCC;
+  color: #FFF;
 }
 
 .budget-notice {

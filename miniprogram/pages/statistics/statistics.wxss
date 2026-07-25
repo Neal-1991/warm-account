@@ -270,14 +270,19 @@
 }
 
 .drawer-record-info {
-  flex: 1;
+  flex: 1 1 0;
+  width: 0;
   margin: 0 20rpx;
   min-width: 0;
+  overflow: hidden;
 }
 
 .drawer-record-category {
   font-size: 28rpx;
   color: var(--theme-text, #333);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .drawer-record-remark {
@@ -310,6 +315,9 @@
   font-size: 30rpx;
   font-weight: 500;
   color: var(--theme-text, #333);
+  flex-shrink: 0;
+  white-space: nowrap;
+  margin-left: 16rpx;
 }
 
 .drawer-empty {
@@ -318,4 +326,9 @@
   padding: 80rpx 0;
   color: var(--theme-muted, #999);
   font-size: 26rpx;
+}
+
+.drawer-record-images {
+  margin-left: 8rpx;
+  font-size: 24rpx;
 }

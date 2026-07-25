@@ -110,6 +110,10 @@ Page({
     const app = getApp()
     app.ensureSession().then(session => {
       if (this._loadSeq !== loadSeq) return
+      if (session.restoreFailed) {
+        console.warn('session restore failed, keep local data')
+        return
+      }
       if (!session.authenticated || !session.bookId) {
         this._loadSeq += 1
         this.resetHomeData()
@@ -217,13 +221,11 @@ Page({
 
       if (!recordRes.result) {
         console.error('loadData: no result returned')
-        wx.showToast({ title: '数据加载失败', icon: 'none' })
         return
       }
 
       if (!recordRes.result.success) {
         console.error('loadData: success false', recordRes.result.error)
-        wx.showToast({ title: '数据加载失败', icon: 'none' })
         return
       }
 
@@ -259,7 +261,9 @@ Page({
     } catch (err) {
       if (!this.isCurrentLoad(loadSeq, month)) return
       console.error('loadData error:', err)
-      wx.showToast({ title: '数据加载失败', icon: 'none' })
+      if (err.errCode !== -1 && err.errCode !== undefined) {
+        wx.showToast({ title: '网络异常,请稍后重试', icon: 'none' })
+      }
     }
   },
 
