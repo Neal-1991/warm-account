@@ -26,6 +26,7 @@
     "backgroundTextStyle": "light",
     "navigationBarBackgroundColor": "#6F8F4E",
     "navigationBarTitleText": "暖账",
-    "navigationBarTextStyle": "white"
+    "navigationBarTextStyle": "white",
+    "viewport-fit": "cover"
   }
 }

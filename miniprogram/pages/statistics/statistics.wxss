@@ -272,7 +272,7 @@
 .drawer-record-info {
   flex: 1 1 0;
   width: 0;
-  margin: 0 20rpx;
+  margin: 0 12rpx;
   min-width: 0;
   overflow: hidden;
 }
@@ -315,11 +315,10 @@
   font-size: 30rpx;
   font-weight: 500;
   color: var(--theme-text, #333);
-  flex: 0 0 240rpx;
+  flex: 0 0 auto;
   white-space: nowrap;
-  margin-left: 16rpx;
+  margin-left: 4rpx;
   text-align: right;
-  box-sizing: border-box;
 }
 
 .drawer-empty {
