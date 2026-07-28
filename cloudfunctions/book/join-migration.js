@@ -179,6 +179,7 @@ function createJoinMigrationService({ db, command, collectionName }) {
       await targetCollection.doc(targetBookId).update({
         data: {
           memberIds: command.addToSet(openId),
+          formerMemberIds: command.pull(openId),
           inviteCodeExpire: null,
           inviteCodeUsedBy: openId,
           joinMigration: command.remove(),

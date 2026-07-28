@@ -1,21 +1,21 @@
-- [ ] 后端 `removeMember` action 实现：权限校验（仅 ownerId）、不能移除自己、joinMigration 中拒绝、事务更新 memberIds 和 formerMemberIds
-- [ ] 后端 `removeMember` 错误码完整：`permission_denied` / `cannot_remove_owner` / `member_not_found` / `join_migration_in_progress`
-- [ ] 移除操作不修改 records / categories / budgets 集合中的任何文档
-- [ ] 后端 `transferOwnership` action 实现：权限校验、目标必须是 memberIds 中成员、不能转给自己、joinMigration 中拒绝、事务更新 ownerId 并设置 transferNotice
-- [ ] 后端 `transferOwnership` 错误码完整：`permission_denied` / `cannot_transfer_to_self` / `target_not_member` / `join_migration_in_progress`
-- [ ] 后端 `acknowledgeTransfer` action 实现：仅当前 ownerId 可调用，清除 transferNotice 字段
-- [ ] `restoreSession` 在用户被移除时返回 `{ authenticated: false, removed: true, removedBookName }`
-- [ ] `restoreSession` 在用户被转让所有权时返回 `{ authenticated: true, transferred: true, fromNickName, transferredAt }`
-- [ ] `getMembers` 能返回 formerMemberIds 对应成员的资料，并带 `isFormer: true` 标记
-- [ ] 前端 family 页管理员视角下显示"移除"和"转让所有权"按钮（非自己、非已退出成员）
-- [ ] 移除确认弹窗显示成员昵称和历史保留说明
-- [ ] 转让确认弹窗显示成员昵称和"将变为普通成员"提示
-- [ ] 移除/转让成功后成员列表刷新，状态正确切换
-- [ ] "已退出成员"分组不显示移除/转让按钮，视觉上标注"已退出"
-- [ ] 被移除方下次打开应用看到告知弹窗（含原账本名）
-- [ ] 被移除方确认后创建新的个人账本（仅预设分类，不带原家庭账本自定义分类）
-- [ ] 被移除方重新被邀请加入原账本能看到旧记录（ownerId 不变），同时从 formerMemberIds 中移除
-- [ ] 被转让方下次打开应用看到告知弹窗（含原管理员昵称）
-- [ ] 被转让方确认后调用 acknowledgeTransfer 清除后端 transferNotice 标记
-- [ ] 转让后原管理员视角变为普通成员（不再看到邀请/移除/转让按钮）
-- [ ] 单元测试覆盖核心场景：移除（成功/权限拒绝/自移除/joinMigration 拒绝）、转让（成功/非成员/自己/权限/joinMigration）、通知（removed/transferred）、getMembers isFormer、重新加入清理 formerMemberIds
+- [x] 后端 `removeMember` action 实现：权限校验（仅 ownerId）、不能移除自己、joinMigration 中拒绝、事务更新 memberIds 和 formerMemberIds
+- [x] 后端 `removeMember` 错误码完整：`PERMISSION_DENIED` / `CANNOT_REMOVE_OWNER` / `MEMBER_NOT_FOUND` / `JOIN_MIGRATION_IN_PROGRESS`（assertBookOwner 已设置 err.code='PERMISSION_DENIED'）
+- [x] 移除操作不修改 records / categories / budgets 集合中的任何文档
+- [x] 后端 `transferOwnership` action 实现：权限校验、目标必须是 memberIds 中成员、不能转给自己、joinMigration 中拒绝、事务更新 ownerId 并设置 transferNotice
+- [x] 后端 `transferOwnership` 错误码完整：`PERMISSION_DENIED` / `CANNOT_TRANSFER_TO_SELF` / `TARGET_NOT_MEMBER` / `JOIN_MIGRATION_IN_PROGRESS`
+- [x] 后端 `acknowledgeTransfer` action 实现：仅当前 ownerId 可调用，清除 transferNotice 字段
+- [x] `restoreSession` 在用户被移除时返回 `{ authenticated: false, removed: true, removedBookName }`
+- [x] `restoreSession` 在用户被转让所有权时返回 `{ authenticated: true, transferred: true, fromNickName, transferredAt }`
+- [x] `getMembers` 能返回 formerMemberIds 对应成员的资料，并带 `isFormer: true` 标记
+- [x] 前端 family 页管理员视角下显示"移除"和"转让所有权"按钮（非自己、非已退出成员）
+- [x] 移除确认弹窗显示成员昵称和历史保留说明
+- [x] 转让确认弹窗显示成员昵称和"将变为普通成员"提示
+- [x] 移除/转让成功后成员列表刷新，状态正确切换
+- [x] "已退出成员"分组不显示移除/转让按钮，视觉上标注"已退出"
+- [x] 被移除方下次打开应用看到告知弹窗（含原账本名）
+- [x] 被移除方确认后创建新的个人账本（仅预设分类，不带原家庭账本自定义分类）
+- [x] 被移除方重新被邀请加入原账本能看到旧记录（ownerId 不变），同时从 formerMemberIds 中移除
+- [x] 被转让方下次打开应用看到告知弹窗（含原管理员昵称）
+- [x] 被转让方确认后调用 acknowledgeTransfer 清除后端 transferNotice 标记
+- [x] 转让后原管理员视角变为普通成员（不再看到邀请/移除/转让按钮）
+- [x] 单元测试覆盖核心场景：移除（成功/权限拒绝/自移除/joinMigration 拒绝）、转让（成功/非成员/自己/权限/joinMigration）、通知（removed/transferred）、getMembers isFormer、重新加入清理 formerMemberIds（book-actions.test.js 13 个测试 + member-removal.test.js 4 个 + ownership-transfer.test.js 3 个）
