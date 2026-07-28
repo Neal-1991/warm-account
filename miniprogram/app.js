@@ -1,11 +1,14 @@
 const config = require('./utils/config')
 const { setupUpdateManager } = require('./utils/update-manager')
+const theme = require('./utils/theme')
 
 App({
   globalData: {
     openId: null,
     bookId: null,
-    userInfo: null
+    userInfo: null,
+    themeId: theme.DEFAULT_THEME_ID,
+    _budgetViewCache: {}
   },
 
   onLaunch() {
@@ -16,6 +19,7 @@ App({
 
     setupUpdateManager(wx)
     this.restoreLocalSession()
+    this.applyTheme()
     this.sessionReady = this.ensureSession()
 
     console.log(`[暖账] 当前环境: ${config.isTest ? '测试' : '生产'} (suffix: ${config.suffix})`)
@@ -29,6 +33,7 @@ App({
     this.globalData.openId = wx.getStorageSync('openId') || null
     this.globalData.bookId = wx.getStorageSync('bookId') || null
     this.globalData.userInfo = wx.getStorageSync('userInfo') || null
+    this.globalData.themeId = theme.getLocalThemeId(this.globalData.openId)
   },
 
   ensureSession(options = {}) {
@@ -47,7 +52,8 @@ App({
       authenticated: Boolean(this.getOpenId() && this.getBookId()),
       openId: this.getOpenId(),
       bookId: this.getBookId(),
-      userInfo: this.getUserInfo()
+      userInfo: this.getUserInfo(),
+      themeId: this.getThemeId()
     }
 
     const request = wx.cloud.callFunction({
@@ -74,13 +80,15 @@ App({
       this.setSession({
         openId: result.openId,
         bookId: result.bookId,
-        userInfo: result.userInfo || localSession.userInfo
+        userInfo: result.userInfo || localSession.userInfo,
+        themeId: result.userInfo?.preferences?.themeId || localSession.themeId
       })
       this._sessionResult = {
         authenticated: true,
         openId: this.globalData.openId,
         bookId: this.globalData.bookId,
-        userInfo: this.globalData.userInfo
+        userInfo: this.globalData.userInfo,
+        themeId: this.globalData.themeId
       }
       return this._sessionResult
     }).catch(err => {
@@ -102,16 +110,18 @@ App({
     return request
   },
 
-  setSession({ openId, bookId, userInfo }) {
+  setSession({ openId, bookId, userInfo, themeId }) {
     wx.removeStorageSync('manualLogout')
     this.setOpenId(openId)
     this.setBookId(bookId)
     this.setUserInfo(userInfo || null)
+    this.setThemeId(themeId || userInfo?.preferences?.themeId || theme.getLocalThemeId(openId), { sync: false })
     this._sessionResult = {
       authenticated: Boolean(openId && bookId),
       openId: openId || null,
       bookId: bookId || null,
-      userInfo: userInfo || null
+      userInfo: this.globalData.userInfo || null,
+      themeId: this.globalData.themeId
     }
   },
 
@@ -119,9 +129,12 @@ App({
     this.globalData.openId = null
     this.globalData.bookId = null
     this.globalData.userInfo = null
+    this.globalData.themeId = theme.getLocalThemeId(null)
+    this.globalData._budgetViewCache = {}
     wx.removeStorageSync('openId')
     wx.removeStorageSync('bookId')
     wx.removeStorageSync('userInfo')
+    this.applyTheme()
     this._sessionResult = null
   },
 
@@ -137,15 +150,80 @@ App({
 
   // 保存用户信息（同时保存到全局数据和 Storage）
   setUserInfo(userInfo) {
-    this.globalData.userInfo = userInfo
-    if (userInfo) {
-      wx.setStorageSync('userInfo', userInfo)
+    const nextUserInfo = userInfo ? { ...userInfo } : null
+    if (nextUserInfo) {
+      nextUserInfo.preferences = {
+        ...(nextUserInfo.preferences || {}),
+        themeId: this.globalData.themeId || theme.DEFAULT_THEME_ID
+      }
+    }
+    this.globalData.userInfo = nextUserInfo
+    if (nextUserInfo) {
+      wx.setStorageSync('userInfo', nextUserInfo)
     } else {
       wx.removeStorageSync('userInfo')
     }
     if (this._sessionResult) {
-      this._sessionResult.userInfo = userInfo || null
+      this._sessionResult.userInfo = nextUserInfo || null
     }
+  },
+
+  getThemeId() {
+    if (!this.globalData.themeId) {
+      this.globalData.themeId = theme.getLocalThemeId(this.getOpenId())
+    }
+    return this.globalData.themeId
+  },
+
+  getThemeStyle() {
+    return theme.themeStyle(this.getThemeId())
+  },
+
+  getThemeList() {
+    return theme.THEMES
+  },
+
+  applyTheme(themeId = this.getThemeId()) {
+    const normalizedThemeId = theme.normalizeThemeId(themeId)
+    theme.applyTheme(normalizedThemeId)
+  },
+
+  setThemeId(themeId, options = {}) {
+    const normalizedThemeId = theme.setLocalThemeId(this.getOpenId(), themeId)
+    this.globalData.themeId = normalizedThemeId
+    if (this.globalData.userInfo) {
+      this.globalData.userInfo = {
+        ...this.globalData.userInfo,
+        preferences: {
+          ...(this.globalData.userInfo.preferences || {}),
+          themeId: normalizedThemeId
+        }
+      }
+      wx.setStorageSync('userInfo', this.globalData.userInfo)
+    }
+    if (this._sessionResult) {
+      this._sessionResult.themeId = normalizedThemeId
+      this._sessionResult.userInfo = this.globalData.userInfo
+    }
+    this.applyTheme(normalizedThemeId)
+    if (options.sync) {
+      this.syncThemePreference(normalizedThemeId)
+    }
+    return normalizedThemeId
+  },
+
+  syncThemePreference(themeId = this.getThemeId()) {
+    if (!this.getOpenId()) return Promise.resolve()
+    return wx.cloud.callFunction({
+      name: 'login',
+      data: {
+        action: 'updatePreferences',
+        preferences: { themeId },
+        isTest: config.isTest
+      }
+    }).catch(err => {
+      console.error('sync theme preference failed:', err)
+    })
   },
 
   getOpenId() {
@@ -192,6 +270,44 @@ App({
       this._sessionResult.bookId = bookId || null
       this._sessionResult.authenticated = Boolean(bookId && this._sessionResult.openId)
     }
+  },
+
+  budgetCacheKey(bookId, month) {
+    return `${config.isTest ? 'test' : 'prod'}:${bookId || ''}:${month || ''}`
+  },
+
+  getBudgetViewCache(bookId, month) {
+    return this.globalData._budgetViewCache?.[this.budgetCacheKey(bookId, month)] || null
+  },
+
+  setBudgetViewCache(bookId, month, view) {
+    if (!bookId || !month || !view) return
+    this.globalData._budgetViewCache = {
+      ...(this.globalData._budgetViewCache || {}),
+      [this.budgetCacheKey(bookId, month)]: view
+    }
+  },
+
+  invalidateBudgetCache(bookId, month) {
+    if (!this.globalData._budgetViewCache) return
+    if (!bookId) {
+      this.globalData._budgetViewCache = {}
+      return
+    }
+    if (month) {
+      const cache = { ...this.globalData._budgetViewCache }
+      delete cache[this.budgetCacheKey(bookId, month)]
+      this.globalData._budgetViewCache = cache
+      return
+    }
+    const prefix = `${config.isTest ? 'test' : 'prod'}:${bookId}:`
+    const nextCache = {}
+    Object.keys(this.globalData._budgetViewCache).forEach(key => {
+      if (!key.startsWith(prefix)) {
+        nextCache[key] = this.globalData._budgetViewCache[key]
+      }
+    })
+    this.globalData._budgetViewCache = nextCache
   },
 
   logout() {

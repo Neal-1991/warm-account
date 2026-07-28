@@ -2,7 +2,10 @@
   margin: 20rpx 30rpx;
   border-radius: 16rpx;
   padding: 30rpx;
-  color: #FFFFFF;
+  color: var(--summary-text, #FFFFFF);
+  background: var(--summary-bg, linear-gradient(135deg, var(--theme-accent, #6F8F4E) 0%, var(--theme-accent-soft, #A8B87A) 100%));
+  border: 1px solid var(--summary-border, transparent);
+  box-shadow: 0 12rpx 28rpx rgba(43, 57, 38, 0.14);
 }
 
 .month-label {
@@ -36,13 +39,13 @@
 }
 
 .expense {
-  color: #FFE5E5;
+  color: var(--summary-expense, #FFE8DE);
 }
 
 .income {
-  color: #E5FFE5;
+  color: var(--summary-income, #DBF4F7);
 }
 
 .balance {
-  color: #FFFFFF;
+  color: var(--summary-text, #FFFFFF);
 }

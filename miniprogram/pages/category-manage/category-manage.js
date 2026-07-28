@@ -1,10 +1,29 @@
 const config = require('../../utils/config')
 const { filterBigCategories } = require('./category-manage-utils')
 const {
-  COMMON_EMOJIS,
-  emojiFromIndex,
-  emojiFromInput
-} = require('../../utils/category-emoji')
+  DEFAULT_ICON_KEY,
+  iconForCategory,
+  iconOptions,
+  recommendIconKey
+} = require('../../utils/category-icons')
+
+const BUILTIN_ICON_OPTIONS = iconOptions('expense')
+
+function moveItem(list, id, delta) {
+  const index = list.findIndex(item => item._id === id)
+  const targetIndex = index + delta
+  if (index < 0 || targetIndex < 0 || targetIndex >= list.length) {
+    return list
+  }
+  const next = list.slice()
+  const current = next[index]
+  next[index] = next[targetIndex]
+  next[targetIndex] = current
+  return next.map((item, itemIndex) => ({
+    ...item,
+    order: itemIndex + 1
+  }))
+}
 
 Page({
   data: {
@@ -12,18 +31,22 @@ Page({
     bigCategories: [],
     visibleBigCategories: [],
     childMap: {},
-    commonEmojis: COMMON_EMOJIS,
+    iconOptions: BUILTIN_ICON_OPTIONS,
+    themeStyle: '',
     showRename: false,
     renameTarget: null,
     renameName: '',
     renameIcon: '',
+    renameIconKey: '',
     showDelete: false,
     deleteTarget: null,
     deleteRecordCount: 0,
     deleteMergeOptions: [],
     showAddBig: false,
     newBigName: '',
-    newBigIcon: '📌',
+    newBigIcon: '',
+    newBigIconKey: DEFAULT_ICON_KEY,
+    newBigIconTouched: false,
     showAddChild: false,
     addChildParentId: '',
     addChildParentName: '',
@@ -31,10 +54,16 @@ Page({
   },
 
   onLoad() {
+    const app = getApp()
+    this.setData({ themeStyle: app.getThemeStyle() })
+    app.applyTheme()
     this.loadCategories()
   },
 
   onShow() {
+    const app = getApp()
+    this.setData({ themeStyle: app.getThemeStyle() })
+    app.applyTheme()
     this.loadCategories()
   },
 
@@ -50,10 +79,24 @@ Page({
     }).then(res => {
       if (!res.result || !res.result.success) return
       const cats = res.result.categories || []
-      const bigCategories = cats.filter(c => c.parentId === null)
+      const bigCategories = cats
+        .filter(c => c.parentId === null)
+        .map(category => ({
+          ...category,
+          iconInfo: iconForCategory(category)
+        }))
+      const bigById = new Map(bigCategories.map(category => [category._id, category]))
       const childMap = {}
       bigCategories.forEach(big => {
-        childMap[big._id] = cats.filter(c => c.parentId === big._id)
+        childMap[big._id] = cats
+          .filter(c => c.parentId === big._id)
+          .map(category => {
+            const parent = bigById.get(category.parentId)
+            return {
+              ...category,
+              iconInfo: parent?.iconInfo || iconForCategory(parent)
+            }
+          })
       })
       this.setData({
         bigCategories,
@@ -70,7 +113,86 @@ Page({
     const tab = e.currentTarget.dataset.tab
     this.setData({
       activeTab: tab,
-      visibleBigCategories: filterBigCategories(this.data.bigCategories, tab)
+      visibleBigCategories: filterBigCategories(this.data.bigCategories, tab),
+      iconOptions: iconOptions(tab)
+    })
+  },
+
+  updateBigCategoryOrder(nextVisible) {
+    let cursor = 0
+    return this.data.bigCategories.map(category => {
+      if (category.type !== this.data.activeTab) return category
+      const nextCategory = nextVisible[cursor]
+      cursor += 1
+      return nextCategory || category
+    })
+  },
+
+  moveBig(e) {
+    const categoryId = e.currentTarget.dataset.id
+    const direction = Number(e.currentTarget.dataset.direction)
+    const nextVisible = moveItem(this.data.visibleBigCategories, categoryId, direction)
+    if (nextVisible === this.data.visibleBigCategories) return
+
+    this.setData({
+      visibleBigCategories: nextVisible,
+      bigCategories: this.updateBigCategoryOrder(nextVisible)
+    })
+
+    wx.cloud.callFunction({
+      name: 'category',
+      data: {
+        action: 'reorderBig',
+        bookId: getApp().getBookId(),
+        type: this.data.activeTab,
+        orderedIds: nextVisible.map(category => category._id),
+        isTest: config.isTest
+      }
+    }).then(res => {
+      if (!res.result?.success) {
+        wx.showToast({ title: res.result?.error || '排序失败', icon: 'none' })
+        this.loadCategories()
+      }
+    }).catch(err => {
+      console.error('moveBig error:', err)
+      wx.showToast({ title: '排序失败', icon: 'none' })
+      this.loadCategories()
+    })
+  },
+
+  moveChild(e) {
+    const parentId = e.currentTarget.dataset.parentId
+    const categoryId = e.currentTarget.dataset.id
+    const direction = Number(e.currentTarget.dataset.direction)
+    const currentChildren = this.data.childMap[parentId] || []
+    const nextChildren = moveItem(currentChildren, categoryId, direction)
+    if (nextChildren === currentChildren) return
+
+    this.setData({
+      childMap: {
+        ...this.data.childMap,
+        [parentId]: nextChildren
+      }
+    })
+
+    wx.cloud.callFunction({
+      name: 'category',
+      data: {
+        action: 'reorderChildren',
+        bookId: getApp().getBookId(),
+        parentId,
+        orderedIds: nextChildren.map(category => category._id),
+        isTest: config.isTest
+      }
+    }).then(res => {
+      if (!res.result?.success) {
+        wx.showToast({ title: res.result?.error || '排序失败', icon: 'none' })
+        this.loadCategories()
+      }
+    }).catch(err => {
+      console.error('moveChild error:', err)
+      wx.showToast({ title: '排序失败', icon: 'none' })
+      this.loadCategories()
     })
   },
 
@@ -81,7 +203,9 @@ Page({
       showRename: true,
       renameTarget: cat,
       renameName: cat.name,
-      renameIcon: cat.icon || ''
+      renameIcon: cat.icon || '',
+      renameIconKey: cat.iconInfo?.iconKey || cat.iconKey || '',
+      iconOptions: iconOptions(cat.type || this.data.activeTab)
     })
   },
   onRenameChild(e) {
@@ -90,17 +214,18 @@ Page({
       showRename: true,
       renameTarget: cat,
       renameName: cat.name,
-      renameIcon: ''
+      renameIcon: '',
+      renameIconKey: ''
     })
   },
   onRenameNameInput(e) {
     this.setData({ renameName: e.detail.value })
   },
-  onRenameIconInput(e) {
-    this.setData({ renameIcon: e.detail.value || '' })
-  },
-  onSelectEmoji(e) {
-    this.setData({ renameIcon: e.currentTarget.dataset.emoji })
+  onSelectRenameIcon(e) {
+    this.setData({
+      renameIconKey: e.currentTarget.dataset.iconKey || DEFAULT_ICON_KEY,
+      renameIcon: ''
+    })
   },
   confirmRename() {
     const name = this.data.renameName.trim()
@@ -109,16 +234,20 @@ Page({
       return
     }
     const app = getApp()
+    const data = {
+      action: 'rename',
+      categoryId: this.data.renameTarget._id,
+      name,
+      bookId: app.getBookId(),
+      isTest: config.isTest
+    }
+    if (this.data.renameTarget.parentId === null) {
+      data.icon = this.data.renameIcon
+      data.iconKey = this.data.renameIconKey || ''
+    }
     wx.cloud.callFunction({
       name: 'category',
-      data: {
-        action: 'rename',
-        categoryId: this.data.renameTarget._id,
-        name,
-        icon: this.data.renameIcon,
-        bookId: app.getBookId(),
-        isTest: config.isTest
-      }
+      data
     }).then(res => {
       if (res.result?.success) {
         wx.showToast({ title: '改名成功', icon: 'success' })
@@ -160,10 +289,10 @@ Page({
         const parent = this.data.bigCategories.find(b => b._id === parentId)
         const siblings = (this.data.childMap[parentId] || []).filter(c => c._id !== cat._id)
         const options = [
-          { id: parentId, label: parent ? `归并到「${parent.name}」` : '归并到父类' }
+          { id: parentId, label: parent ? `「${parent.name}」` : '父类' }
         ].concat(siblings.map(s => ({
           id: s._id,
-          label: `归并到「${s.name}」`
+          label: `「${s.name}」`
         })))
         this.setData({
           showDelete: true,
@@ -258,18 +387,29 @@ Page({
 
   // ===== 添加大类 =====
   onAddBig() {
-    this.setData({ showAddBig: true, newBigName: '', newBigIcon: '📌' })
+    this.setData({
+      showAddBig: true,
+      newBigName: '',
+      newBigIcon: '',
+      newBigIconKey: DEFAULT_ICON_KEY,
+      newBigIconTouched: false,
+      iconOptions: iconOptions(this.data.activeTab)
+    })
   },
   onAddBigNameInput(e) {
-    this.setData({ newBigName: e.detail.value })
+    const newBigName = e.detail.value
+    const data = { newBigName }
+    if (!this.data.newBigIconTouched) {
+      data.newBigIconKey = recommendIconKey(newBigName, this.data.activeTab)
+    }
+    this.setData(data)
   },
-  onSelectAddBigEmoji(e) {
-    const newBigIcon = emojiFromIndex(this.data.commonEmojis, e)
-    console.log('select add-big emoji:', newBigIcon)
-    this.setData({ newBigIcon })
-  },
-  onAddBigIconInput(e) {
-    this.setData({ newBigIcon: emojiFromInput(e) })
+  onSelectAddBigIcon(e) {
+    this.setData({
+      newBigIconKey: e.currentTarget.dataset.iconKey || DEFAULT_ICON_KEY,
+      newBigIcon: '',
+      newBigIconTouched: true
+    })
   },
   confirmAddBig() {
     const name = this.data.newBigName.trim()
@@ -283,7 +423,8 @@ Page({
       data: {
         action: 'addBig',
         name,
-        icon: this.data.newBigIcon,
+        icon: '',
+        iconKey: this.data.newBigIconKey || recommendIconKey(name, this.data.activeTab) || DEFAULT_ICON_KEY,
         type: this.data.activeTab,
         bookId: app.getBookId(),
         isTest: config.isTest

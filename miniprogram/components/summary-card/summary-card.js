@@ -4,7 +4,8 @@ Component({
     month: { type: String },
     expenseAmount: { type: String },
     incomeAmount: { type: String },
-    balanceAmount: { type: String }
+    balanceAmount: { type: String },
+    themeStyle: { type: String }
   },
   data: {}
 })

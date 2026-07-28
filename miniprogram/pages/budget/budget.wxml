@@ -1,4 +1,4 @@
-<view class="container">
+<view class="container" style="{{themeStyle}}">
   <view class="month-header">
     <month-selector month="{{currentMonth}}" bindchange="onMonthChange" />
   </view>
@@ -74,7 +74,9 @@
           wx:key="categoryId"
           class="category-row"
         >
-          <text class="category-icon">{{item.icon}}</text>
+          <view class="category-icon-wrap">
+            <category-icon icon-info="{{item.iconInfo}}" emoji="{{item.icon}}" size="small" />
+          </view>
           <view class="category-copy">
             <text class="category-name">{{item.name}}</text>
             <text wx:if="{{budget}}" class="category-usage">已用 ¥{{item.usedAmount}} · {{item.percent}}%</text>
@@ -90,7 +92,7 @@
               placeholder="0.00"
             />
           </view>
-          <text wx:if="{{canEdit}}" class="remove-category" data-index="{{index}}" bindtap="removeCategory">删除</text>
+          <text wx:if="{{canEdit}}" class="remove-category" data-index="{{index}}" bindtap="removeCategory">移除</text>
           <view wx:if="{{budget}}" class="category-progress">
             <view
               class="category-progress-fill {{item.status}}"
@@ -119,7 +121,9 @@
           data-category-id="{{item._id}}"
           bindtap="addCategory"
         >
-          <text class="category-icon">{{item.icon}}</text>
+          <view class="category-icon-wrap">
+            <category-icon icon-info="{{item.iconInfo}}" emoji="{{item.icon}}" size="small" />
+          </view>
           <text>{{item.name}}</text>
         </view>
       </scroll-view>

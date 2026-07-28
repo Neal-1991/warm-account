@@ -1,5 +1,11 @@
-const FALLBACK_ICON = '📝'
+const { iconForCategory } = require('./category-icons')
+
+const FALLBACK_ICON = '📌'
 const FALLBACK_NAME = '未分类'
+
+function fallbackIconInfo() {
+  return iconForCategory(null, FALLBACK_ICON)
+}
 
 function buildCategoryDisplayMap(categories) {
   const bigById = new Map()
@@ -11,6 +17,7 @@ function buildCategoryDisplayMap(categories) {
       displayById[category._id] = {
         name: category.name,
         icon: category.icon || FALLBACK_ICON,
+        iconInfo: iconForCategory(category, FALLBACK_ICON),
         parentName: category.name,
         valid: true,
         isBigCategory: true
@@ -25,6 +32,7 @@ function buildCategoryDisplayMap(categories) {
       displayById[category._id] = {
         name: FALLBACK_NAME,
         icon: FALLBACK_ICON,
+        iconInfo: fallbackIconInfo(),
         parentName: FALLBACK_NAME,
         valid: false,
         isBigCategory: false,
@@ -36,6 +44,7 @@ function buildCategoryDisplayMap(categories) {
     displayById[category._id] = {
       name: category.name,
       icon: parent.icon || FALLBACK_ICON,
+      iconInfo: iconForCategory(parent, FALLBACK_ICON),
       parentName: parent.name,
       valid: true,
       isBigCategory: false
@@ -49,6 +58,7 @@ function resolveCategoryDisplay(displayMap, categoryId) {
   return displayMap[categoryId] || {
     name: FALLBACK_NAME,
     icon: FALLBACK_ICON,
+    iconInfo: fallbackIconInfo(),
     parentName: FALLBACK_NAME,
     valid: false,
     isBigCategory: false,
@@ -58,11 +68,28 @@ function resolveCategoryDisplay(displayMap, categoryId) {
 
 function aggregateByParent(records, displayMap) {
   const amountMap = {}
-  for (const record of records || []) {
-    const display = resolveCategoryDisplay(displayMap, record.categoryId)
-    amountMap[display.parentName] = (amountMap[display.parentName] || 0) + record.amount
+  for (const group of aggregateByParentDetails(records, displayMap)) {
+    amountMap[group.name] = group.amount
   }
   return amountMap
+}
+
+function aggregateByParentDetails(records, displayMap) {
+  const groupMap = {}
+  for (const record of records || []) {
+    const display = resolveCategoryDisplay(displayMap, record.categoryId)
+    const name = display.parentName
+    if (!groupMap[name]) {
+      groupMap[name] = {
+        name,
+        icon: display.icon,
+        iconInfo: display.iconInfo,
+        amount: 0
+      }
+    }
+    groupMap[name].amount += record.amount
+  }
+  return Object.values(groupMap)
 }
 
 module.exports = {
@@ -70,5 +97,6 @@ module.exports = {
   FALLBACK_NAME,
   buildCategoryDisplayMap,
   resolveCategoryDisplay,
-  aggregateByParent
+  aggregateByParent,
+  aggregateByParentDetails
 }

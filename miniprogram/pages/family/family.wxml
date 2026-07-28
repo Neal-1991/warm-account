@@ -1,4 +1,4 @@
-<view class="container">
+<view class="container" style="{{themeStyle}}">
   <view class="family-info" wx:if="{{bookName}}">
     <text class="family-name">{{bookName}}</text>
     <view class="invite-section" wx:if="{{isAdmin}}">
@@ -22,7 +22,7 @@
         </view>
         <text
           class="remove-btn"
-          wx:if="{{item.openId !== currentOpenId && isAdmin}}"
+          wx:if="{{false}}"
           bindtap="removeMember"
           data-openid="{{item.openId}}"
         >移除</text>

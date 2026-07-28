@@ -1,33 +1,61 @@
-<view class="container">
-  <!-- Tab 切换 -->
+<view class="container" style="{{themeStyle}}">
   <view class="tabs">
     <view class="tab {{activeTab === 'expense' ? 'active expense' : ''}}" bindtap="switchTab" data-tab="expense">支出</view>
     <view class="tab {{activeTab === 'income' ? 'active income' : ''}}" bindtap="switchTab" data-tab="income">收入</view>
   </view>
 
-  <!-- 分类列表 -->
   <view class="category-list">
     <block wx:for="{{visibleBigCategories}}" wx:key="_id">
-      <!-- 大类 -->
       <view class="big-section">
         <view class="big-header">
           <view class="big-info">
-            <text class="big-icon">{{item.icon}}</text>
+            <category-icon icon-info="{{item.iconInfo}}" emoji="{{item.icon}}" size="normal" />
             <text class="big-name">{{item.name}}</text>
             <text class="big-sub-count">{{childMap[item._id].length || 0}}个子类</text>
             <text class="tag" wx:if="{{!item.isSystem}}">自建</text>
           </view>
           <view class="big-actions">
+            <text
+              class="action-link subtle"
+              wx:if="{{index > 0}}"
+              bindtap="moveBig"
+              data-id="{{item._id}}"
+              data-direction="-1"
+            >上移</text>
+            <text
+              class="action-link subtle"
+              wx:if="{{index < visibleBigCategories.length - 1}}"
+              bindtap="moveBig"
+              data-id="{{item._id}}"
+              data-direction="1"
+            >下移</text>
             <text class="action-link" bindtap="onRenameBig" data-cat="{{item}}">改名</text>
             <text class="action-link danger" wx:if="{{!item.isSystem}}" bindtap="onDeleteBig" data-cat="{{item}}">删除</text>
           </view>
         </view>
-        <!-- 子类 -->
+
         <view class="child-list">
           <block wx:for="{{childMap[item._id]}}" wx:key="_id">
             <view class="child-row">
+              <category-icon icon-info="{{item.iconInfo}}" emoji="{{item.icon}}" size="small" />
               <text class="child-name">{{item.name}}</text>
               <view class="child-actions">
+                <text
+                  class="action-link subtle"
+                  wx:if="{{index > 0}}"
+                  bindtap="moveChild"
+                  data-parent-id="{{item.parentId}}"
+                  data-id="{{item._id}}"
+                  data-direction="-1"
+                >上移</text>
+                <text
+                  class="action-link subtle"
+                  wx:if="{{index < childMap[item.parentId].length - 1}}"
+                  bindtap="moveChild"
+                  data-parent-id="{{item.parentId}}"
+                  data-id="{{item._id}}"
+                  data-direction="1"
+                >下移</text>
                 <text class="action-link" bindtap="onRenameChild" data-cat="{{item}}">改名</text>
                 <text class="action-link danger" bindtap="onDeleteChild" data-cat="{{item}}">删除</text>
               </view>
@@ -41,13 +69,11 @@
     </block>
   </view>
 
-  <!-- 底部添加大类 -->
   <view class="bottom-bar">
     <button class="add-big-btn" bindtap="onAddBig">+ 添加大类</button>
   </view>
 </view>
 
-<!-- ====== 改名弹窗 ====== -->
 <view class="modal-mask" wx:if="{{showRename}}" catchtap="hideModals">
   <view class="modal" catchtap="stopBubble">
     <view class="modal-title">
@@ -55,12 +81,20 @@
     </view>
     <view class="modal-body">
       <block wx:if="{{renameTarget && renameTarget.parentId === null}}">
-        <view class="emoji-picker">
-          <block wx:for="{{commonEmojis}}" wx:key="*this">
-            <text class="emoji-opt {{renameIcon === item ? 'selected' : ''}}" bindtap="onSelectEmoji" data-emoji="{{item}}">{{item}}</text>
-          </block>
-        </view>
-        <input class="rename-input" value="{{renameIcon}}" bindinput="onRenameIconInput" placeholder="emoji" maxlength="2" />
+        <scroll-view scroll-y class="icon-grid-scroll">
+          <view class="icon-grid">
+            <view
+              wx:for="{{iconOptions}}"
+              wx:key="key"
+              class="icon-opt {{renameIconKey === item.key ? 'selected' : ''}}"
+              bindtap="onSelectRenameIcon"
+              data-icon-key="{{item.key}}"
+            >
+              <image src="{{item.assetPath}}" mode="aspectFit" />
+              <text class="icon-opt-name">{{item.name}}</text>
+            </view>
+          </view>
+        </scroll-view>
       </block>
       <input class="rename-input name-input" value="{{renameName}}" bindinput="onRenameNameInput" placeholder="分类名称" />
     </view>
@@ -71,7 +105,6 @@
   </view>
 </view>
 
-<!-- ====== 删除确认弹窗 ====== -->
 <view class="modal-mask" wx:if="{{showDelete}}" catchtap="hideModals">
   <view class="modal" catchtap="stopBubble">
     <view class="modal-title">删除「{{deleteTarget.name}}」</view>
@@ -80,11 +113,11 @@
         <view class="delete-hint">该分类下有 <text class="count">{{deleteRecordCount}}</text> 条记账记录。</view>
         <view class="merge-options">
           <view class="merge-opt primary" bindtap="confirmDeleteWithMerge" data-merge-id="{{deleteMergeOptions[0].id}}">
-            🔀 {{deleteMergeOptions[0].label}}
+            合并到{{deleteMergeOptions[0].label}}
           </view>
           <block wx:for="{{deleteMergeOptions}}" wx:key="id" wx:if="{{index > 0}}">
             <view class="merge-opt" bindtap="confirmDeleteWithMerge" data-merge-id="{{item.id}}">
-              🔀 {{item.label}}
+              合并到{{item.label}}
             </view>
           </block>
         </view>
@@ -100,18 +133,25 @@
   </view>
 </view>
 
-<!-- ====== 添加大类弹窗 ====== -->
 <view class="modal-mask" wx:if="{{showAddBig}}" catchtap="hideModals">
   <view class="modal" catchtap="stopBubble">
     <view class="modal-title">添加大类</view>
     <view class="modal-body">
-      <view class="emoji-picker">
-        <block wx:for="{{commonEmojis}}" wx:key="*this">
-          <text class="emoji-opt {{newBigIcon === item ? 'selected' : ''}}" catchtap="onSelectAddBigEmoji" data-index="{{index}}">{{item}}</text>
-        </block>
-      </view>
-      <input class="rename-input" value="{{newBigIcon}}" bindinput="onAddBigIconInput" placeholder="emoji" maxlength="8" />
       <input class="rename-input name-input" value="{{newBigName}}" bindinput="onAddBigNameInput" placeholder="大类名称" />
+      <scroll-view scroll-y class="icon-grid-scroll">
+        <view class="icon-grid">
+          <view
+            wx:for="{{iconOptions}}"
+            wx:key="key"
+            class="icon-opt {{newBigIconKey === item.key ? 'selected' : ''}}"
+            catchtap="onSelectAddBigIcon"
+            data-icon-key="{{item.key}}"
+          >
+            <image src="{{item.assetPath}}" mode="aspectFit" />
+            <text class="icon-opt-name">{{item.name}}</text>
+          </view>
+        </view>
+      </scroll-view>
     </view>
     <view class="modal-footer">
       <button class="modal-btn cancel" bindtap="hideModals">取消</button>
@@ -120,7 +160,6 @@
   </view>
 </view>
 
-<!-- ====== 添加小类弹窗 ====== -->
 <view class="modal-mask" wx:if="{{showAddChild}}" catchtap="hideModals">
   <view class="modal" catchtap="stopBubble">
     <view class="modal-title">添加小类到「{{addChildParentName}}」</view>

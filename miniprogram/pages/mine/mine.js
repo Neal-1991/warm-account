@@ -6,15 +6,36 @@ Page({
     userInfo: null,
     showEditModal: false,
     editingNickName: '',
-    budgetStatus: ''
+    budgetStatus: '',
+    themeStyle: '',
+    themeList: [],
+    themeId: '',
+    themeName: '',
+    showThemePicker: false
   },
 
   onLoad() {
+    this.refreshTheme()
     this.loadUserInfo()
   },
 
   onShow() {
+    this.refreshTheme()
     this.loadUserInfo()
+  },
+
+  refreshTheme() {
+    const app = getApp()
+    const themeId = app.getThemeId()
+    const themeList = app.getThemeList()
+    const currentTheme = themeList.find(item => item.id === themeId)
+    this.setData({
+      themeStyle: app.getThemeStyle(),
+      themeList,
+      themeId,
+      themeName: currentTheme?.name || ''
+    })
+    app.applyTheme()
   },
 
   async loadUserInfo() {
@@ -80,6 +101,30 @@ Page({
 
   goToAbout() {
     wx.navigateTo({ url: '/pages/about/about' })
+  },
+
+  openThemePicker() {
+    this.refreshTheme()
+    this.setData({ showThemePicker: true })
+  },
+
+  closeThemePicker() {
+    this.setData({ showThemePicker: false })
+  },
+
+  stopBubble() {},
+
+  onSelectTheme(e) {
+    const themeId = e.currentTarget.dataset.themeId
+    const app = getApp()
+    const nextThemeId = app.setThemeId(themeId, { sync: true })
+    const currentTheme = app.getThemeList().find(item => item.id === nextThemeId)
+    this.setData({
+      themeId: nextThemeId,
+      themeName: currentTheme?.name || '',
+      themeStyle: app.getThemeStyle(),
+      showThemePicker: false
+    })
   },
 
   // 显示编辑弹窗

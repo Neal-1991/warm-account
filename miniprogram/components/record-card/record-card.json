@@ -1,3 +1,6 @@
 {
-  "component": true
+  "component": true,
+  "usingComponents": {
+    "category-icon": "/components/category-icon/category-icon"
+  }
 }

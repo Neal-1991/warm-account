@@ -59,16 +59,19 @@ async function ensureBookPresets(event, bookId) {
   const resolvedParents = await Promise.all(ALL_PRESETS.map(async preset => {
     const existing = findBigCategory(existingCategories, preset)
     if (existing) {
-      if (existing.presetKey !== preset.key) {
+      const nextIconKey = preset.iconKey || ''
+      if (existing.presetKey !== preset.key || (existing.iconKey || '') !== nextIconKey) {
         await categories.doc(existing._id).update({
           data: {
             presetKey: preset.key,
+            iconKey: nextIconKey,
             type: preset.type,
             order: preset.order,
             isSystem: true
           }
         })
         existing.presetKey = preset.key
+        existing.iconKey = nextIconKey
         taggedExisting++
       }
       return { preset, parentId: existing._id }
@@ -79,6 +82,7 @@ async function ensureBookPresets(event, bookId) {
         presetKey: preset.key,
         name: preset.name,
         icon: preset.icon,
+        iconKey: preset.iconKey || '',
         order: preset.order,
         type: preset.type,
         isVisible: true,
@@ -92,6 +96,7 @@ async function ensureBookPresets(event, bookId) {
       presetKey: preset.key,
       name: preset.name,
       icon: preset.icon,
+      iconKey: preset.iconKey || '',
       order: preset.order,
       type: preset.type,
       isVisible: true,
@@ -176,6 +181,7 @@ async function updateSystemPresets(event) {
           presetKey: preset.key,
           name: preset.name,
           icon: preset.icon,
+          iconKey: preset.iconKey || '',
           order: preset.order,
           type: preset.type,
           isVisible: true,
@@ -192,6 +198,7 @@ async function updateSystemPresets(event) {
         data: {
           presetKey: preset.key,
           icon: preset.icon,
+          iconKey: preset.iconKey || '',
           order: preset.order,
           type: preset.type,
           isSystem: true

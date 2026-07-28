@@ -1,4 +1,4 @@
-<view class="container">
+<view class="container" style="{{themeStyle}}">
   <view class="form">
     <!-- 类型切换 -->
     <view class="type-switch">
@@ -16,7 +16,12 @@
     <view class="form-item" bindtap="openCategoryPicker">
       <text class="label">分类</text>
       <view class="value">
-        <text class="category-icon">{{selectedCategory.icon}}</text>
+        <category-icon
+          wx:if="{{selectedCategory.categoryId}}"
+          icon-info="{{selectedCategory.iconInfo}}"
+          emoji="{{selectedCategory.icon}}"
+          size="small"
+        />
         <text class="category-name">{{selectedCategory.name || '请选择'}}</text>
         <text class="arrow">›</text>
       </view>
@@ -55,15 +60,16 @@
   </view>
 
   <!-- 提交按钮 -->
-  <button class="submit-btn" type="primary" bindtap="onSubmit" disabled="{{!canSubmit || submitting}}">
-    {{submitting ? '保存中...' : '提交'}}
-  </button>
+  <view class="submit-btn {{(!canSubmit || submitting) ? 'disabled' : ''}}" bindtap="onSubmit">
+    {{submitting ? (isEdit ? '保存中...' : '提交中...') : submitText}}
+  </view>
 
   <!-- 分类选择器 -->
   <category-picker
     visible="{{showCategoryPicker}}"
     categories="{{categories}}"
     type="{{type}}"
+    theme-style="{{themeStyle}}"
     bind:select="onCategorySelect"
     bind:close="closeCategoryPicker"
     bind:addchild="onAddChild"

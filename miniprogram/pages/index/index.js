@@ -11,7 +11,7 @@ const {
 } = require('../../utils/homepage-records')
 
 const EMPTY_SUMMARY = { expense: '0.00', income: '0.00', balance: '0.00' }
-const EMPTY_BUDGET_VIEW = { configured: false, canEdit: false, isHistorical: false }
+const EMPTY_BUDGET_VIEW = { configured: false, canEdit: false, isHistorical: false, loading: false }
 
 function currentMonthValue(now = new Date()) {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
@@ -22,6 +22,16 @@ function monthDisplay(month) {
   return `${year}年${monthNum}月`
 }
 
+function budgetLoadingView(month) {
+  return {
+    configured: false,
+    canEdit: false,
+    isHistorical: month < currentMonthValue(),
+    loading: true,
+    month
+  }
+}
+
 Page({
   data: {
     currentMonth: '',
@@ -29,7 +39,8 @@ Page({
     summary: EMPTY_SUMMARY,
     records: [],
     recordGroups: [],
-    budgetView: EMPTY_BUDGET_VIEW
+    budgetView: EMPTY_BUDGET_VIEW,
+    themeStyle: ''
   },
 
   onLoad() {
@@ -38,12 +49,17 @@ Page({
     this._skipNextShow = true
     this.setData({
       currentMonth: month,
-      currentMonthDisplay: monthDisplay(month)
+      currentMonthDisplay: monthDisplay(month),
+      budgetView: budgetLoadingView(month),
+      themeStyle: getApp().getThemeStyle()
     })
+    getApp().applyTheme()
     this.loadData()
   },
 
   onShow() {
+    this.setData({ themeStyle: getApp().getThemeStyle() })
+    getApp().applyTheme()
     if (this._skipNextShow) {
       this._skipNextShow = false
       return
@@ -56,7 +72,7 @@ Page({
     this.setData({
       currentMonth: month,
       currentMonthDisplay: monthDisplay(month),
-      budgetView: EMPTY_BUDGET_VIEW
+      budgetView: budgetLoadingView(month)
     })
     this.loadData()
   },
@@ -94,6 +110,10 @@ Page({
     const app = getApp()
     app.ensureSession().then(session => {
       if (this._loadSeq !== loadSeq) return
+      if (session.restoreFailed) {
+        console.warn('session restore failed, keep local data')
+        return
+      }
       if (!session.authenticated || !session.bookId) {
         this._loadSeq += 1
         this.resetHomeData()
@@ -140,7 +160,12 @@ Page({
       return
     }
 
-    this.setData({ budgetView: EMPTY_BUDGET_VIEW })
+    const cachedBudgetView = app.getBudgetViewCache(bookId, month)
+    if (cachedBudgetView) {
+      this.setData({ budgetView: cachedBudgetView })
+    } else if (this.data.budgetView.month !== month || !this.data.budgetView.configured) {
+      this.setData({ budgetView: budgetLoadingView(month) })
+    }
 
     const categoryPromise = wx.cloud.callFunction({
       name: 'category',
@@ -166,12 +191,28 @@ Page({
       }
     }).then(budgetRes => {
       if (!this.isCurrentLoad(loadSeq, month)) return
+      const budgetView = {
+        ...buildBudgetView(budgetRes.result, month),
+        month,
+        loading: false,
+        error: false
+      }
+      app.setBudgetViewCache(bookId, month, budgetView)
       this.setData({
-        budgetView: buildBudgetView(budgetRes.result, month)
+        budgetView
       })
     }).catch(error => {
       if (!this.isCurrentLoad(loadSeq, month)) return
       console.error('home budget load error:', error)
+      const currentView = this.data.budgetView || budgetLoadingView(month)
+      this.setData({
+        budgetView: {
+          ...currentView,
+          loading: false,
+          error: true,
+          month
+        }
+      })
     })
 
     try {
@@ -180,13 +221,11 @@ Page({
 
       if (!recordRes.result) {
         console.error('loadData: no result returned')
-        wx.showToast({ title: '数据加载失败', icon: 'none' })
         return
       }
 
       if (!recordRes.result.success) {
         console.error('loadData: success false', recordRes.result.error)
-        wx.showToast({ title: '数据加载失败', icon: 'none' })
         return
       }
 
@@ -205,6 +244,7 @@ Page({
           amountDisplay: (record.amount / 100).toFixed(2),
           dateStr: dateUtil.formatDate(new Date(record.date)),
           icon: catInfo.icon,
+          iconInfo: catInfo.iconInfo,
           categoryName: catInfo.name,
           remark: record.remark || '',
           hasImages: (record.images || []).length > 0
@@ -221,7 +261,9 @@ Page({
     } catch (err) {
       if (!this.isCurrentLoad(loadSeq, month)) return
       console.error('loadData error:', err)
-      wx.showToast({ title: '数据加载失败', icon: 'none' })
+      if (err.errCode !== -1 && err.errCode !== undefined) {
+        wx.showToast({ title: '网络异常,请稍后重试', icon: 'none' })
+      }
     }
   },
 

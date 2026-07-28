@@ -3,11 +3,19 @@ const config = require('../../utils/config')
 Page({
   data: {
     loading: false,
-    agreed: false
+    agreed: false,
+    themeStyle: '',
+    themeAccent: '#6F8F4E'
   },
 
   onLoad() {
     const app = getApp()
+    const currentTheme = app.getThemeList().find(item => item.id === app.getThemeId())
+    this.setData({
+      themeStyle: app.getThemeStyle(),
+      themeAccent: currentTheme?.accent || '#6F8F4E'
+    })
+    app.applyTheme()
     app.ensureSession().then(session => {
       if (!session.authenticated) return
       const pages = getCurrentPages()

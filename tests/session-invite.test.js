@@ -1,5 +1,7 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
+const path = require('node:path')
+const Module = require('node:module')
 
 const {
   generateUniqueInviteCode,
@@ -17,6 +19,22 @@ function loadApp({ initialStorage = {}, restoreResult, restoreError }) {
   const storage = new Map(Object.entries(initialStorage))
   let appDefinition
   let callCount = 0
+  const originalResolveFilename = Module._resolveFilename
+  const envPath = path.resolve(__dirname, '../miniprogram/utils/env.js')
+
+  Module._resolveFilename = function resolveFilename(request, parent, isMain, options) {
+    const parentFile = parent?.filename?.replace(/\\/g, '/')
+    if (request === './env' && parentFile?.endsWith('/miniprogram/utils/config.js')) {
+      return envPath
+    }
+    return originalResolveFilename.call(this, request, parent, isMain, options)
+  }
+  require.cache[envPath] = {
+    id: envPath,
+    filename: envPath,
+    loaded: true,
+    exports: { env: 'test-env' }
+  }
 
   global.wx = {
     getStorageSync(key) {
@@ -50,7 +68,10 @@ function loadApp({ initialStorage = {}, restoreResult, restoreError }) {
     storage,
     getCallCount: () => callCount,
     cleanup() {
+      Module._resolveFilename = originalResolveFilename
       delete require.cache[appPath]
+      delete require.cache[require.resolve('../miniprogram/utils/config')]
+      delete require.cache[envPath]
       delete global.wx
       delete global.App
     }

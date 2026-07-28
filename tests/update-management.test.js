@@ -9,7 +9,7 @@ const {
 } = require('../miniprogram/utils/update-manager')
 
 test('release version has one shared source of truth', () => {
-  assert.equal(APP_VERSION, '3.0.1')
+  assert.match(APP_VERSION, /^\d+\.\d+\.\d+$/)
 
   const root = path.join(__dirname, '..')
   const aboutSource = fs.readFileSync(

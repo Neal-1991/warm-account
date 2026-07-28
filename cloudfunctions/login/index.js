@@ -24,6 +24,11 @@ const ensureCategories = async (bookId, isTest) => {
   return initRes.result
 }
 
+const normalizePreferences = (preferences = {}) => {
+  const themeId = typeof preferences.themeId === 'string' ? preferences.themeId.slice(0, 32) : ''
+  return themeId ? { themeId } : {}
+}
+
 exports.main = async (event, context) => {
   try {
     const { nickName, avatarUrl, action } = event
@@ -58,7 +63,8 @@ exports.main = async (event, context) => {
       let userInfo = member
         ? {
             nickName: member.nickName || '微信用户',
-            avatarUrl: member.avatarUrl || ''
+            avatarUrl: member.avatarUrl || '',
+            preferences: normalizePreferences(member.preferences)
           }
         : null
 
@@ -106,6 +112,7 @@ exports.main = async (event, context) => {
             openId,
             nickName: profile.nickName,
             avatarUrl: profile.avatarUrl,
+            preferences: {},
             role: 'admin',
             joinedAt: db.serverDate()
           }
@@ -128,6 +135,42 @@ exports.main = async (event, context) => {
       }
 
       return { success: true }
+    }
+
+    if (action === 'updatePreferences') {
+      if (!openId) {
+        return { success: false, error: 'openId is required' }
+      }
+      const nextPreferences = normalizePreferences(event.preferences)
+      if (Object.keys(nextPreferences).length === 0) {
+        return { success: false, error: 'preferences are required' }
+      }
+      const memberCol = db.collection(collectionName('members'))
+      const members = await memberCol.where({ openId }).limit(1).get()
+      if (members.data.length > 0) {
+        const current = members.data[0]
+        await memberCol.doc(current._id).update({
+          data: {
+            preferences: {
+              ...(current.preferences || {}),
+              ...nextPreferences
+            },
+            updatedAt: db.serverDate()
+          }
+        })
+      } else {
+        await memberCol.add({
+          data: {
+            openId,
+            nickName: '微信用户',
+            avatarUrl: '',
+            preferences: nextPreferences,
+            role: 'admin',
+            joinedAt: db.serverDate()
+          }
+        })
+      }
+      return { success: true, preferences: nextPreferences }
     }
 
     // batch query member profiles (called from family page)
@@ -178,7 +221,7 @@ exports.main = async (event, context) => {
 
     // load or create member profile
     const memberCol = db.collection(collectionName('members'))
-    let userInfo = { nickName: nickName || '微信用户', avatarUrl: avatarUrl || '' }
+    let userInfo = { nickName: nickName || '微信用户', avatarUrl: avatarUrl || '', preferences: {} }
 
     try {
       const members = await memberCol.where({ openId }).limit(1).get()
@@ -192,12 +235,14 @@ exports.main = async (event, context) => {
             ? await cloud.getTempFileURL({ fileList: [m.avatarUrl] }).then(r => r.fileList?.[0]?.tempFileURL || m.avatarUrl).catch(() => m.avatarUrl)
             : m.avatarUrl
         }
+        userInfo.preferences = normalizePreferences(m.preferences)
       } else {
         await memberCol.add({
           data: {
             openId,
             nickName: userInfo.nickName,
             avatarUrl: userInfo.avatarUrl,
+            preferences: userInfo.preferences || {},
             role: 'admin',
             joinedAt: db.serverDate()
           }

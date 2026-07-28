@@ -1,15 +1,16 @@
-const config = require('../../utils/config')
 const {
-  COMMON_EMOJIS,
-  emojiFromIndex,
-  emojiFromInput
-} = require('../../utils/category-emoji')
+  DEFAULT_ICON_KEY,
+  iconForCategory,
+  iconOptions,
+  recommendIconKey
+} = require('../../utils/category-icons')
 
 Component({
   properties: {
     visible: { type: Boolean, value: false },
     categories: { type: Array },
-    type: { type: String, value: 'expense' }
+    type: { type: String, value: 'expense' },
+    themeStyle: { type: String }
   },
   data: {
     bigCategories: [],
@@ -22,8 +23,10 @@ Component({
     showAddBig: false,
     newChildName: '',
     newBigName: '',
-    newBigIcon: '📌',
-    commonEmojis: COMMON_EMOJIS
+    newBigIcon: '',
+    newBigIconKey: DEFAULT_ICON_KEY,
+    newBigIconTouched: false,
+    iconOptions: iconOptions('expense')
   },
   lifetimes: {
     attached() {
@@ -31,14 +34,13 @@ Component({
     }
   },
   observers: {
-    'categories': function() {
+    categories() {
       this.initCategories()
     },
-    'type': function() {
+    type() {
       this.initCategories()
     },
-    'visible': function(val) {
-      // 每次打开时重新初始化（管理页返回后分类可能已变更）
+    visible(val) {
       if (val) this.initCategories()
     }
   },
@@ -53,8 +55,11 @@ Component({
           return true
         }
         return false
-      })
-      // 默认选中第一个大类
+      }).map(c => ({
+        ...c,
+        iconInfo: iconForCategory(c)
+      }))
+
       const firstId = big.length > 0 ? big[0]._id : null
       const firstName = big.length > 0 ? big[0].name : ''
       this.setData({
@@ -67,7 +72,10 @@ Component({
         showAddBig: false,
         newChildName: '',
         newBigName: '',
-        newBigIcon: '📌'
+        newBigIcon: '',
+        newBigIconKey: DEFAULT_ICON_KEY,
+        newBigIconTouched: false,
+        iconOptions: iconOptions(typeFilter)
       })
       if (firstId) {
         this.updateChildren(firstId)
@@ -82,7 +90,6 @@ Component({
         this.setData({ childCategories: [], selectedChildId: null })
         return
       }
-      // 收集同名大类的所有 _id（去重后的系统+自建合并情况）
       const allBigIds = cats
         .filter(c => c.parentId === null && c.name === bigCat.name)
         .map(c => c._id)
@@ -103,7 +110,6 @@ Component({
       this.updateChildren(bigId)
     },
     selectBigOnly() {
-      // 选择大类（记在大类下）
       this.setData({
         selectedIsBig: true,
         selectedChildId: null
@@ -115,13 +121,10 @@ Component({
         selectedIsBig: false
       })
     },
-    // ===== 管理入口 =====
     onManage() {
-      // 关闭选择器，跳转管理页
       this.triggerEvent('close')
       wx.navigateTo({ url: '/pages/category-manage/category-manage' })
     },
-    // ===== 添加小类 =====
     onAddChildEntry() {
       this.setData({ showAddChild: true, showAddBig: false })
     },
@@ -137,32 +140,50 @@ Component({
       })
       this.setData({ newChildName: '', showAddChild: false })
     },
-    // ===== 添加大类 =====
     onAddBigEntry() {
-      this.setData({ showAddBig: true, showAddChild: false })
+      const type = this.properties.type || 'expense'
+      this.setData({
+        showAddBig: true,
+        showAddChild: false,
+        newBigName: '',
+        newBigIcon: '',
+        newBigIconKey: DEFAULT_ICON_KEY,
+        newBigIconTouched: false,
+        iconOptions: iconOptions(type)
+      })
     },
     onAddBigNameInput(e) {
-      this.setData({ newBigName: e.detail.value })
+      const newBigName = e.detail.value
+      const data = { newBigName }
+      if (!this.data.newBigIconTouched) {
+        data.newBigIconKey = recommendIconKey(newBigName, this.properties.type)
+      }
+      this.setData(data)
     },
-    onSelectAddBigEmoji(e) {
-      const newBigIcon = emojiFromIndex(this.data.commonEmojis, e)
-      console.log('select quick add-big emoji:', newBigIcon)
-      this.setData({ newBigIcon })
-    },
-    onAddBigIconInput(e) {
-      this.setData({ newBigIcon: emojiFromInput(e) })
+    onSelectAddBigIcon(e) {
+      this.setData({
+        newBigIconKey: e.currentTarget.dataset.key || DEFAULT_ICON_KEY,
+        newBigIcon: '',
+        newBigIconTouched: true
+      })
     },
     confirmAddBig() {
       const name = this.data.newBigName.trim()
       if (!name) return
       this.triggerEvent('addbig', {
         name,
-        icon: this.data.newBigIcon || '📌',
+        icon: '',
+        iconKey: this.data.newBigIconKey || recommendIconKey(name, this.properties.type) || DEFAULT_ICON_KEY,
         type: this.properties.type
       })
-      this.setData({ newBigName: '', newBigIcon: '📌', showAddBig: false })
+      this.setData({
+        newBigName: '',
+        newBigIcon: '',
+        newBigIconKey: DEFAULT_ICON_KEY,
+        newBigIconTouched: false,
+        showAddBig: false
+      })
     },
-    // ===== 确定 =====
     onConfirm() {
       const big = this.data.bigCategories.find(b => b._id === this.data.selectedBigId)
       if (!big) {
@@ -170,11 +191,12 @@ Component({
         return
       }
       if (this.data.selectedIsBig) {
-        // 选择的是大类
         this.triggerEvent('select', {
           categoryId: big._id,
           categoryName: big.name,
           icon: big.icon || '',
+          iconInfo: big.iconInfo,
+          iconKey: big.iconInfo?.iconKey || big.iconKey || '',
           isBigCategory: true
         })
       } else {
@@ -187,6 +209,8 @@ Component({
           categoryId: child._id,
           categoryName: child.name,
           icon: big.icon || '',
+          iconInfo: big.iconInfo,
+          iconKey: big.iconInfo?.iconKey || big.iconKey || '',
           isBigCategory: false
         })
       }

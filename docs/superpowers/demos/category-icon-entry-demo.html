@@ -1,0 +1,1588 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>暖账分类图标录入 Demo</title>
+  <style>
+    :root {
+      --accent: #6F8F4E;
+      --accent-soft: #A8B87A;
+      --bg: #F4F6F2;
+      --surface: #FFFFFF;
+      --tint: #F1F5EA;
+      --border: #E3E9DF;
+      --text: #263238;
+      --muted: #7A8580;
+      --income: #2F8F9D;
+      --expense: #D96F3D;
+      --shadow: 0 18px 50px rgba(43, 54, 40, 0.12);
+    }
+
+    [data-theme="pink"] {
+      --accent: #D96C9F;
+      --accent-soft: #F4B6CF;
+      --bg: #FFF7FA;
+      --tint: #FFF0F6;
+      --border: #F1DCE7;
+      --text: #352A30;
+      --muted: #806E77;
+      --shadow: 0 18px 50px rgba(117, 67, 91, 0.13);
+    }
+
+    [data-theme="white"] {
+      --accent: #5E6A72;
+      --accent-soft: #7E8A92;
+      --bg: #F5F7F8;
+      --tint: #F7F9FA;
+      --border: #DDE5E8;
+      --text: #263238;
+      --muted: #6F7A82;
+      --shadow: 0 18px 50px rgba(30, 41, 49, 0.11);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      letter-spacing: 0;
+    }
+
+    button,
+    input,
+    select {
+      font: inherit;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    .page {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 28px 22px 36px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      margin-bottom: 22px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .brand-mark {
+      width: 44px;
+      height: 44px;
+      border-radius: 14px;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(135deg, var(--accent), var(--accent-soft));
+      color: #fff;
+      box-shadow: 0 10px 24px rgba(72, 92, 62, 0.16);
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 24px;
+      font-weight: 700;
+      line-height: 1.15;
+    }
+
+    .brand p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .theme-switch {
+      display: flex;
+      gap: 8px;
+      padding: 6px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: var(--surface);
+      box-shadow: 0 10px 28px rgba(35, 45, 35, 0.06);
+      flex-shrink: 0;
+    }
+
+    .theme-btn {
+      border: 0;
+      border-radius: 12px;
+      min-width: 74px;
+      min-height: 36px;
+      padding: 0 12px;
+      background: transparent;
+      color: var(--muted);
+    }
+
+    .theme-btn.active {
+      background: var(--tint);
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.25fr) 360px;
+      gap: 20px;
+      align-items: stretch;
+    }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    .panel-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 18px 20px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .panel-head h2,
+    .panel-head h3 {
+      margin: 0;
+      font-size: 17px;
+      line-height: 1.3;
+    }
+
+    .panel-head span {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .add-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 40px;
+      padding: 0 16px;
+      border: 0;
+      border-radius: 14px;
+      color: #fff;
+      background: var(--accent);
+      font-weight: 700;
+      box-shadow: 0 10px 24px rgba(75, 95, 63, 0.18);
+      white-space: nowrap;
+    }
+
+    .category-section {
+      padding: 16px 20px 20px;
+    }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0 0 12px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 99px;
+      background: var(--accent-soft);
+    }
+
+    .category-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(92px, 1fr));
+      gap: 14px;
+    }
+
+    .category-card {
+      min-height: 128px;
+      padding: 13px 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: linear-gradient(180deg, var(--surface), var(--tint));
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      position: relative;
+    }
+
+    .category-card.added {
+      outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+      outline-offset: -2px;
+    }
+
+    .tag {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      max-width: 70px;
+      border-radius: 999px;
+      padding: 3px 7px;
+      color: var(--accent);
+      background: color-mix(in srgb, var(--tint) 75%, #fff);
+      border: 1px solid var(--border);
+      font-size: 11px;
+      line-height: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .category-name {
+      max-width: 100%;
+      color: var(--text);
+      font-size: 15px;
+      font-weight: 700;
+      line-height: 1.2;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .category-key {
+      max-width: 100%;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.25;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .icon-frame {
+      width: 64px;
+      height: 64px;
+      border-radius: 22px;
+      display: grid;
+      place-items: center;
+      color: var(--accent);
+      background: var(--tint);
+      border: 1px solid var(--border);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+      flex-shrink: 0;
+    }
+
+    .icon-frame.expense {
+      color: var(--expense);
+    }
+
+    .icon-frame.income {
+      color: var(--income);
+    }
+
+    .icon-frame svg {
+      width: 37px;
+      height: 37px;
+      display: block;
+    }
+
+    .icon-stroke,
+    .icon-fill {
+      stroke: currentColor;
+      stroke-width: 2.2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+    }
+
+    .icon-fill {
+      fill: color-mix(in srgb, currentColor 16%, transparent);
+    }
+
+    .icon-money {
+      fill: currentColor;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: 7px;
+      font-weight: 900;
+      text-anchor: middle;
+      dominant-baseline: middle;
+    }
+
+    .side {
+      display: flex;
+      flex-direction: column;
+      min-height: 100%;
+    }
+
+    .flow {
+      padding: 18px 20px 20px;
+      display: grid;
+      gap: 14px;
+    }
+
+    .flow-step {
+      display: grid;
+      grid-template-columns: 36px minmax(0, 1fr);
+      gap: 12px;
+      align-items: start;
+    }
+
+    .step-no {
+      width: 32px;
+      height: 32px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      background: var(--tint);
+      color: var(--accent);
+      border: 1px solid var(--border);
+      font-weight: 800;
+    }
+
+    .flow-step strong {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 14px;
+    }
+
+    .flow-step p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .data-panel {
+      margin-top: 20px;
+    }
+
+    .mobile-panel {
+      margin-top: 20px;
+      overflow: hidden;
+    }
+
+    .mobile-stage {
+      padding: 22px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 390px;
+      gap: 22px;
+      align-items: center;
+    }
+
+    .phone-preview-stack {
+      display: grid;
+      gap: 18px;
+      justify-items: center;
+    }
+
+    .mobile-notes {
+      display: grid;
+      gap: 12px;
+    }
+
+    .note-card {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: color-mix(in srgb, var(--tint) 68%, #fff);
+      padding: 14px 15px;
+    }
+
+    .note-card strong {
+      display: block;
+      font-size: 14px;
+      margin-bottom: 5px;
+    }
+
+    .note-card p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .phone-shell {
+      width: 390px;
+      height: 760px;
+      border-radius: 36px;
+      padding: 12px;
+      background: #1E2427;
+      box-shadow: 0 28px 70px rgba(22, 31, 33, 0.28);
+    }
+
+    .phone-shell.picker-phone {
+      height: 700px;
+    }
+
+    .phone-screen {
+      height: 100%;
+      overflow: hidden;
+      border-radius: 27px;
+      background: var(--bg);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .phone-nav {
+      min-height: 64px;
+      padding: 20px 18px 12px;
+      color: #fff;
+      background: var(--accent);
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      font-size: 17px;
+      font-weight: 800;
+    }
+
+    .phone-summary {
+      margin: 14px 16px 8px;
+      border-radius: 8px;
+      padding: 14px 16px;
+      color: #fff;
+      background: linear-gradient(135deg, var(--accent), var(--accent-soft));
+    }
+
+    [data-theme="white"] .phone-summary {
+      color: var(--text);
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
+
+    .phone-summary-title {
+      font-size: 12px;
+      opacity: 0.82;
+      margin-bottom: 8px;
+    }
+
+    .phone-summary-amount {
+      font-size: 28px;
+      font-weight: 900;
+      line-height: 1;
+    }
+
+    .phone-section-title {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin: 14px 18px 8px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .phone-record-list {
+      padding: 0 12px 18px;
+      overflow: auto;
+    }
+
+    .phone-form {
+      padding: 14px 16px 10px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .phone-field-label {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .phone-input {
+      min-height: 42px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      padding: 0 12px;
+      display: flex;
+      align-items: center;
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .phone-type-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .phone-type-pill {
+      min-height: 34px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .phone-type-pill.active {
+      color: var(--income);
+      background: color-mix(in srgb, var(--tint) 70%, #fff);
+      border-color: color-mix(in srgb, var(--income) 35%, var(--border));
+    }
+
+    .phone-recommend {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: color-mix(in srgb, var(--tint) 76%, #fff);
+    }
+
+    .phone-recommend .icon-frame {
+      width: 40px;
+      height: 40px;
+      border-radius: 14px;
+    }
+
+    .phone-recommend .icon-frame svg {
+      width: 26px;
+      height: 26px;
+    }
+
+    .phone-recommend-title {
+      font-size: 14px;
+      font-weight: 900;
+      line-height: 1.25;
+    }
+
+    .phone-recommend-sub {
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.25;
+    }
+
+    .phone-picker-title {
+      margin: 4px 16px 8px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .phone-icon-grid {
+      padding: 0 12px 18px;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      overflow: auto;
+    }
+
+    .phone-icon-option {
+      min-height: 78px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 7px 5px;
+    }
+
+    .phone-icon-option.selected {
+      border-color: var(--accent);
+      background: var(--tint);
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
+    }
+
+    .phone-icon-option .icon-frame {
+      width: 36px;
+      height: 36px;
+      border-radius: 12px;
+    }
+
+    .phone-icon-option .icon-frame svg {
+      width: 24px;
+      height: 24px;
+    }
+
+    .phone-icon-label {
+      width: 100%;
+      color: var(--text);
+      font-size: 11px;
+      font-weight: 800;
+      line-height: 1.15;
+      text-align: center;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .phone-record {
+      min-height: 72px;
+      margin: 8px 0;
+      padding: 12px;
+      border-radius: 8px;
+      background: var(--surface);
+      border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+      display: grid;
+      grid-template-columns: 38px minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .phone-record .icon-frame {
+      width: 36px;
+      height: 36px;
+      border-radius: 12px;
+    }
+
+    .phone-record .icon-frame svg {
+      width: 24px;
+      height: 24px;
+    }
+
+    .phone-record .icon-stroke,
+    .phone-record .icon-fill {
+      stroke-width: 2.45;
+    }
+
+    .phone-record .icon-money {
+      font-size: 7.5px;
+    }
+
+    .record-main {
+      min-width: 0;
+    }
+
+    .record-title {
+      font-size: 15px;
+      font-weight: 800;
+      line-height: 1.2;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .record-subtitle {
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.2;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .record-amount {
+      font-size: 15px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .record-amount.expense {
+      color: var(--expense);
+    }
+
+    .record-amount.income {
+      color: var(--income);
+    }
+
+    .data-box {
+      margin: 0;
+      padding: 16px 20px 20px;
+      min-height: 132px;
+      overflow: auto;
+      color: #263238;
+      background: color-mix(in srgb, var(--tint) 70%, #fff);
+      border-top: 1px solid var(--border);
+      font: 13px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      white-space: pre-wrap;
+    }
+
+    .modal-mask {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 22px;
+      background: rgba(22, 29, 25, 0.38);
+      z-index: 20;
+    }
+
+    .modal-mask.open {
+      display: flex;
+    }
+
+    .modal {
+      width: min(780px, 100%);
+      max-height: min(88vh, 820px);
+      overflow: auto;
+      border-radius: 8px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      box-shadow: 0 30px 80px rgba(18, 24, 20, 0.28);
+    }
+
+    .modal-body {
+      padding: 18px 22px 20px;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 130px minmax(0, 1fr);
+      gap: 14px;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .form-row label {
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .segmented {
+      display: inline-grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      padding: 5px;
+      border: 1px solid var(--border);
+      border-radius: 15px;
+      background: var(--tint);
+      width: min(260px, 100%);
+    }
+
+    .segment {
+      min-height: 36px;
+      border: 0;
+      border-radius: 11px;
+      background: transparent;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .segment.active {
+      background: var(--surface);
+      color: var(--accent);
+      box-shadow: 0 6px 18px rgba(45, 55, 44, 0.08);
+    }
+
+    .text-input {
+      width: 100%;
+      min-height: 44px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--surface);
+      color: var(--text);
+      padding: 0 14px;
+      outline: none;
+    }
+
+    .text-input:focus {
+      border-color: var(--accent-soft);
+      box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent-soft) 28%, transparent);
+    }
+
+    .recommend {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-height: 84px;
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--tint);
+    }
+
+    .recommend strong {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 14px;
+    }
+
+    .recommend span {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .icon-options {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(78px, 1fr));
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .icon-option {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface);
+      min-height: 104px;
+      padding: 10px 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      color: var(--text);
+    }
+
+    .icon-option.selected {
+      border-color: var(--accent);
+      background: var(--tint);
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 20%, transparent);
+    }
+
+    .icon-option .icon-frame {
+      width: 50px;
+      height: 50px;
+      border-radius: 17px;
+    }
+
+    .icon-option .icon-frame svg {
+      width: 29px;
+      height: 29px;
+    }
+
+    .icon-option-name {
+      max-width: 100%;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      padding: 14px 22px 20px;
+      border-top: 1px solid var(--border);
+      background: color-mix(in srgb, var(--tint) 55%, #fff);
+    }
+
+    .ghost-btn,
+    .primary-btn {
+      min-height: 42px;
+      border-radius: 14px;
+      padding: 0 18px;
+      border: 1px solid var(--border);
+      font-weight: 700;
+    }
+
+    .ghost-btn {
+      background: var(--surface);
+      color: var(--muted);
+    }
+
+    .primary-btn {
+      border-color: var(--accent);
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 24px;
+      transform: translateX(-50%) translateY(20px);
+      min-width: 190px;
+      max-width: calc(100vw - 44px);
+      padding: 12px 16px;
+      border-radius: 14px;
+      background: rgba(38, 50, 56, 0.94);
+      color: #fff;
+      text-align: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 160ms ease, transform 160ms ease;
+      z-index: 40;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    @media (max-width: 930px) {
+      .hero {
+        grid-template-columns: 1fr;
+      }
+
+      .mobile-stage {
+        grid-template-columns: 1fr;
+        justify-items: center;
+      }
+
+      .mobile-notes {
+        width: 100%;
+      }
+
+      .phone-preview-stack {
+        width: 100%;
+      }
+
+      .side {
+        min-height: auto;
+      }
+
+      .category-grid {
+        grid-template-columns: repeat(3, minmax(88px, 1fr));
+      }
+
+      .icon-options {
+        grid-template-columns: repeat(4, minmax(70px, 1fr));
+      }
+    }
+
+    @media (max-width: 620px) {
+      .page {
+        padding: 18px 14px 28px;
+      }
+
+      .topbar {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .theme-switch {
+        width: 100%;
+        overflow-x: auto;
+      }
+
+      .theme-btn {
+        flex: 1;
+      }
+
+      .panel-head {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .category-grid,
+      .icon-options {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .form-row {
+        grid-template-columns: 1fr;
+        gap: 8px;
+      }
+
+      .mobile-stage {
+        padding: 16px;
+      }
+
+      .phone-shell {
+        width: min(390px, calc(100vw - 60px));
+        height: min(760px, calc((100vw - 60px) * 1.95));
+      }
+
+      .modal-body,
+      .modal-footer {
+        padding-left: 16px;
+        padding-right: 16px;
+      }
+    }
+  </style>
+</head>
+<body data-theme="avocado">
+  <div class="page">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 32 32" width="26" height="26">
+            <path d="M16 26s-9-5.7-9-13.1A5.2 5.2 0 0 1 16 9a5.2 5.2 0 0 1 9 3.9C25 20.3 16 26 16 26Z" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linejoin="round" />
+            <path d="M16 10.2v13.5" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" />
+          </svg>
+        </div>
+        <div>
+          <h1>分类图标录入 Demo</h1>
+          <p>统一语义图标库，分类名称由用户决定，图标只表达可复用符号。</p>
+        </div>
+      </div>
+      <nav class="theme-switch" aria-label="主题切换">
+        <button class="theme-btn active" data-theme-choice="avocado" type="button">牛油果绿</button>
+        <button class="theme-btn" data-theme-choice="pink" type="button">淡粉色</button>
+        <button class="theme-btn" data-theme-choice="white" type="button">白色</button>
+      </nav>
+    </header>
+
+    <main class="hero">
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <h2>分类显示预览</h2>
+            <span>预置分类和自定义分类都绑定语义图标，不把图标做成分类名片</span>
+          </div>
+          <button class="add-btn" id="openModal" type="button">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+              <path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" />
+            </svg>
+            新增大类
+          </button>
+        </div>
+        <div id="categorySections"></div>
+      </section>
+
+      <aside class="panel side">
+        <div class="panel-head">
+          <div>
+            <h3>录入策略</h3>
+            <span>新增分类不再把 emoji 作为主入口</span>
+          </div>
+        </div>
+        <div class="flow">
+          <div class="flow-step">
+            <div class="step-no">1</div>
+            <div>
+              <strong>输入分类名</strong>
+              <p>名称变化时立即做关键词匹配，例如“废品回收”推荐“回收收益”。</p>
+            </div>
+          </div>
+          <div class="flow-step">
+            <div class="step-no">2</div>
+            <div>
+              <strong>选择图标</strong>
+              <p>图标选项显示语义标签，最终首页只显示用户自己的分类名。</p>
+            </div>
+          </div>
+          <div class="flow-step">
+            <div class="step-no">3</div>
+            <div>
+              <strong>保存 iconKey</strong>
+              <p>模拟数据中 `iconKey` 是主字段，`icon` 保持为空。</p>
+            </div>
+          </div>
+          <div class="flow-step">
+            <div class="step-no">4</div>
+            <div>
+              <strong>兼容历史数据</strong>
+              <p>旧 emoji 通过映射转换为系统图标展示，不进入新增流程。</p>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </main>
+
+    <section class="panel mobile-panel">
+      <div class="panel-head">
+        <div>
+          <h3>手机端尺寸预览</h3>
+          <span>390px 手机屏幕模拟，同时检查首页记录卡和新增大类图标选择区</span>
+        </div>
+      </div>
+      <div class="mobile-stage">
+        <div class="mobile-notes">
+          <div class="note-card">
+            <strong>判断标准</strong>
+            <p>这里看的不是图标“大图好不好看”，而是缩小到首页记录卡和新增大类网格后，用户还能不能快速区分。</p>
+          </div>
+          <div class="note-card">
+            <strong>当前策略</strong>
+            <p>图标名是“回收收益、票据返款、奖章收益”这类语义标签；真正显示的分类名仍然是用户输入的名称。</p>
+          </div>
+          <div class="note-card">
+            <strong>风险点</strong>
+            <p>如果某个图标在手机选择网格里只剩一团线，就说明正式 PNG 需要进一步简化，而不是继续加细节。</p>
+          </div>
+        </div>
+        <div class="phone-preview-stack">
+          <div class="phone-shell" aria-label="手机首页记录卡预览">
+            <div class="phone-screen">
+              <div class="phone-nav">暖账</div>
+              <div class="phone-summary">
+                <div class="phone-summary-title">本月结余</div>
+                <div class="phone-summary-amount">¥ 8,426.50</div>
+              </div>
+              <div class="phone-section-title">
+                <span>今天</span>
+                <span>7月4日</span>
+              </div>
+              <div class="phone-record-list" id="phoneRecordList"></div>
+            </div>
+          </div>
+          <div class="phone-shell picker-phone" aria-label="手机新增大类图标选择预览">
+            <div class="phone-screen">
+              <div class="phone-nav">新增大类</div>
+              <div class="phone-form">
+                <div>
+                  <span class="phone-field-label">收支类型</span>
+                  <div class="phone-type-row">
+                    <div class="phone-type-pill">支出</div>
+                    <div class="phone-type-pill active">收入</div>
+                  </div>
+                </div>
+                <div>
+                  <span class="phone-field-label">大类名称</span>
+                  <div class="phone-input" id="phonePickerName">废品回收</div>
+                </div>
+                <div>
+                  <span class="phone-field-label">系统推荐</span>
+                  <div class="phone-recommend" id="phoneRecommendBox"></div>
+                </div>
+              </div>
+              <div class="phone-picker-title">选择语义图标</div>
+              <div class="phone-icon-grid" id="phoneIconGrid"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel data-panel">
+      <div class="panel-head">
+        <div>
+          <h3>最近一次保存的模拟数据</h3>
+          <span>这里模拟提交给小程序分类云函数的数据形态</span>
+        </div>
+      </div>
+      <pre class="data-box" id="dataPreview">{}</pre>
+    </section>
+  </div>
+
+  <div class="modal-mask" id="modalMask" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal">
+      <div class="panel-head">
+        <div>
+          <h2 id="modalTitle">新增大类</h2>
+          <span>输入名称后会自动推荐图标，也可以手动选择</span>
+        </div>
+      </div>
+      <div class="modal-body">
+        <div class="form-row">
+          <label>收支类型</label>
+          <div class="segmented" role="group" aria-label="收支类型">
+            <button class="segment active" id="expenseSegment" data-type-choice="expense" type="button">支出</button>
+            <button class="segment" id="incomeSegment" data-type-choice="income" type="button">收入</button>
+          </div>
+        </div>
+        <div class="form-row">
+          <label for="categoryName">大类名称</label>
+          <input class="text-input" id="categoryName" maxlength="12" placeholder="试试输入：废品回收、报销、奖金、红包礼金" />
+        </div>
+        <div class="form-row">
+          <label>系统推荐</label>
+          <div class="recommend" id="recommendBox"></div>
+        </div>
+        <div>
+          <div class="section-title"><span class="dot"></span>统一语义图标库</div>
+          <div class="icon-options" id="iconOptions"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="ghost-btn" id="closeModal" type="button">取消</button>
+        <button class="primary-btn" id="saveCategory" type="button">添加</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const icons = {
+      icon_bowl_chopsticks: { name: '碗筷', type: 'expense', svg: '<path class="icon-stroke" d="M9 5v8M13 5v8M11 13v12"/><path class="icon-stroke" d="M20 5c2.4 4.2 2.4 8.4 0 12v8"/>' },
+      icon_vehicle: { name: '车辆出行', type: 'expense', svg: '<rect class="icon-fill" x="6" y="8" width="20" height="14" rx="4"/><path class="icon-stroke" d="M9 14h14M10 22v3M22 22v3M10 8l2-3h8l2 3"/>' },
+      icon_house: { name: '房屋', type: 'expense', svg: '<path class="icon-fill" d="M5 15 16 6l11 9v12H9V15"/><path class="icon-stroke" d="M13 27v-7h6v7"/>' },
+      icon_salary_card: { name: '工资卡', type: 'income', svg: '<rect class="icon-fill" x="5" y="9" width="22" height="16" rx="4"/><path class="icon-stroke" d="M9 14h14M9 20h8M22 9v-2a2 2 0 0 0-2-2h-8a2 2 0 0 0-2 2v2"/><text class="icon-money" x="22" y="21">¥</text>' },
+      icon_award_money: { name: '奖章收益', type: 'income', svg: '<circle class="icon-fill" cx="21.5" cy="21.5" r="5.5"/><path class="icon-stroke" d="M10 5h12v4a6 6 0 0 1-12 0V5ZM8 6H5v2a4 4 0 0 0 4 4M24 6h3v2a4 4 0 0 1-4 4M16 15v4M12 23h8"/><path class="icon-stroke" d="m21.5 18.5.9 1.8 2 .3-1.4 1.4.3 2-1.8-.9-1.8.9.3-2-1.4-1.4 2-.3.9-1.8Z"/>' },
+      icon_house_savings: { name: '住房资金', type: 'income', svg: '<path class="icon-fill" d="M6 15 16 7l10 8v12H6V15Z"/><path class="icon-stroke" d="M10 27v-7h5v7M17 27v-7h5v7M8 17h16M12 13h8"/><text class="icon-money" x="24" y="10">¥</text>' },
+      icon_growth_money: { name: '增长收益', type: 'income', svg: '<path class="icon-stroke" d="M6 24h20M8 22l5-6 4 3 7-10M21 9h3v3"/><circle class="icon-fill" cx="10" cy="10" r="4"/><circle class="icon-fill" cx="22" cy="22" r="4"/><text class="icon-money" x="10" y="10">¥</text>' },
+      icon_briefcase_clock: { name: '工时收入', type: 'income', svg: '<rect class="icon-fill" x="6" y="10" width="20" height="14" rx="4"/><path class="icon-stroke" d="M12 10V8a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M6 16h20M16 16v3"/><circle class="icon-fill" cx="23" cy="23" r="5"/><path class="icon-stroke" d="M23 20v3l2 1.5"/>' },
+      icon_red_packet_money: { name: '红包钱款', type: 'income', svg: '<rect class="icon-fill" x="8" y="5" width="16" height="22" rx="4"/><path class="icon-stroke" d="M11 12h10M12 8l4 4 4-4M16 12v12"/><circle class="icon-fill" cx="23" cy="22" r="4"/><text class="icon-money" x="23" y="22">¥</text>' },
+      icon_cup: { name: '杯饮', type: 'expense', svg: '<path class="icon-fill" d="M8 13h13v5.5A6.5 6.5 0 0 1 14.5 25 6.5 6.5 0 0 1 8 18.5V13Z"/><path class="icon-stroke" d="M21 15h2.2a3 3 0 0 1 0 6H21M10 7c-1 1-.8 2 .2 3M15 6c-1 1.2-.8 2.3.2 3.2M20 7c-1 1-.8 2 .2 3"/>' },
+      icon_shield_check: { name: '保障盾牌', type: 'expense', svg: '<path class="icon-fill" d="M16 4 7 8v7.5c0 5.4 3.6 9.6 9 12.5 5.4-2.9 9-7.1 9-12.5V8l-9-4Z"/><path class="icon-stroke" d="m11.5 16.5 3 3 6-7"/>' },
+      icon_camera: { name: '相机', type: 'expense', svg: '<rect class="icon-fill" x="5" y="10" width="22" height="16" rx="4"/><path class="icon-stroke" d="M11 10l2-4h6l2 4M16 15.5a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z"/>' },
+      icon_house_debt: { name: '房屋分期', type: 'expense', svg: '<path class="icon-fill" d="M6 15 16 7l10 8v12H6V15Z"/><path class="icon-stroke" d="M12 21h8M16 17v8M10 27h12"/>' },
+      icon_phone: { name: '数码设备', type: 'expense', svg: '<rect class="icon-fill" x="10" y="5" width="12" height="22" rx="3"/><path class="icon-stroke" d="M14 23h4M13 9h6"/>' },
+      icon_wrench: { name: '维修工具', type: 'expense', svg: '<path class="icon-stroke" d="m20 6 6 6-4 4-6-6 4-4ZM16 10 7 19a3 3 0 0 0 4 4l9-9"/>' },
+      icon_subscription: { name: '订阅票据', type: 'expense', svg: '<rect class="icon-fill" x="6" y="7" width="20" height="18" rx="4"/><path class="icon-stroke" d="M11 13h10M11 18h7M20 25v3l-4-3"/>' },
+      icon_receipt_return: { name: '票据返款', type: 'income', svg: '<path class="icon-fill" d="M9 5h13l3 3v19H9z"/><path class="icon-stroke" d="M22 5v5h5M12 12h8M12 17h7M12 22h5M24 22c-3.5 3.4-7.4 3.8-10.5 1.2M13.5 23.2l2.6-2.6M13.5 23.2l3 1.8"/><text class="icon-money" x="23.5" y="17.5">¥</text>' },
+      icon_recycle_money: { name: '回收收益', type: 'income', svg: '<circle class="icon-fill" cx="22" cy="22" r="5"/><path class="icon-stroke" d="M12 8h7l-2-3M19 8l-3 5M23 14l3 5-3 5M26 19h-6M15 25H8l2 3M8 25l3-5"/><text class="icon-money" x="22" y="22">¥</text>' },
+      icon_cart: { name: '购物车', type: 'expense', svg: '<path class="icon-stroke" d="M6 7h3l2.4 12h11.8l2-8H11M13 25a1.5 1.5 0 1 0 0 .1M23 25a1.5 1.5 0 1 0 0 .1"/><path class="icon-fill" d="M12 11h13l-2 8H14z"/>' },
+      icon_phone_bill: { name: '通讯账单', type: 'expense', svg: '<rect class="icon-fill" x="10" y="4" width="12" height="20" rx="3"/><path class="icon-stroke" d="M14 8h4M15 20h2M22 14h4v10h-8v-4"/><text class="icon-money" x="22" y="20">¥</text>' },
+      icon_baby_smile: { name: '育儿照护', type: 'expense', svg: '<circle class="icon-fill" cx="16" cy="15" r="9"/><path class="icon-stroke" d="M12 14h.1M20 14h.1M12.5 19c2 1.8 5 1.8 7 0M13 7c1-3 5-3 6 0"/>' },
+      icon_beauty: { name: '护肤美妆', type: 'expense', svg: '<path class="icon-fill" d="M12 13h8v14h-8z"/><path class="icon-stroke" d="M14 13V8h4v5M11 27h10M22 8l4-4M23 12l4-1M10 8 6 4"/>' },
+      icon_clothes: { name: '衣物配饰', type: 'expense', svg: '<path class="icon-fill" d="M11 6 7 9l3 5v13h12V14l3-5-4-3-3 3h-4l-3-3Z"/><path class="icon-stroke" d="M14 9v6M18 9v6"/>' },
+      icon_gamepad: { name: '娱乐游戏', type: 'expense', svg: '<path class="icon-fill" d="M8 13h16a5 5 0 0 1 4 8l-1.5 2a3 3 0 0 1-4.8-.2L20 20h-8l-1.7 2.8a3 3 0 0 1-4.8.2L4 21a5 5 0 0 1 4-8Z"/><path class="icon-stroke" d="M10 17v4M8 19h4M21 18h.1M24 20h.1"/>' },
+      icon_dumbbell: { name: '运动健身', type: 'expense', svg: '<path class="icon-stroke" d="M7 12v8M11 10v12M21 10v12M25 12v8M11 16h10"/>' },
+      icon_plane: { name: '旅行出行', type: 'expense', svg: '<path class="icon-fill" d="M5 17 27 7l-7 20-4-8-8-2Z"/><path class="icon-stroke" d="M16 19 27 7M20 27l-4-8"/>' },
+      icon_medical: { name: '医疗健康', type: 'expense', svg: '<rect class="icon-fill" x="6" y="8" width="20" height="16" rx="4"/><path class="icon-stroke" d="M13 16h6M16 13v6M12 8V6h8v2"/>' },
+      icon_book: { name: '学习教育', type: 'expense', svg: '<path class="icon-fill" d="M7 7h9v20H7a3 3 0 0 1-3-3V10a3 3 0 0 1 3-3ZM16 7h9a3 3 0 0 1 3 3v14a3 3 0 0 1-3 3h-9z"/><path class="icon-stroke" d="M16 7v20M8 12h5M19 12h5"/>' },
+      icon_gift_social: { name: '人情礼物', type: 'expense', svg: '<rect class="icon-fill" x="6" y="12" width="20" height="14" rx="3"/><path class="icon-stroke" d="M6 16h20M16 12v14M12 12c-4-2-3-6 0-6 2.5 0 4 6 4 6M20 12c4-2 3-6 0-6-2.5 0-4 6-4 6"/>' },
+      icon_bolt_bill: { name: '生活缴费', type: 'expense', svg: '<path class="icon-fill" d="M18 4 8 17h7l-1 11 10-14h-7l1-10Z"/><text class="icon-money" x="24" y="24">¥</text>' },
+      icon_grocery_bag: { name: '买菜日用', type: 'expense', svg: '<path class="icon-fill" d="M9 11h14l-1 16H10L9 11Z"/><path class="icon-stroke" d="M12 11a4 4 0 0 1 8 0M13 17h6M12 21h8"/>' },
+      icon_wallet_refund: { name: '退款入账', type: 'income', svg: '<rect class="icon-fill" x="6" y="10" width="20" height="14" rx="4"/><path class="icon-stroke" d="M21 15h5v4h-5zM15 6l-5 4 5 4M10 10h10"/><text class="icon-money" x="13" y="20">¥</text>' },
+      icon_tag_default: { name: '默认标签', type: 'neutral', svg: '<path class="icon-fill" d="M8 7h16v18H8z"/><path class="icon-stroke" d="M12 12h8M12 17h8M12 22h5"/>' }
+    };
+
+    const iconOrder = [
+      'icon_recycle_money',
+      'icon_receipt_return',
+      'icon_award_money',
+      'icon_red_packet_money',
+      'icon_house_savings',
+      'icon_growth_money',
+      'icon_briefcase_clock',
+      'icon_salary_card',
+      'icon_cup',
+      'icon_shield_check',
+      'icon_camera',
+      'icon_house_debt',
+      'icon_phone',
+      'icon_wrench',
+      'icon_subscription',
+      'icon_bowl_chopsticks',
+      'icon_vehicle',
+      'icon_house',
+      'icon_cart',
+      'icon_phone_bill',
+      'icon_baby_smile',
+      'icon_beauty',
+      'icon_clothes',
+      'icon_gamepad',
+      'icon_dumbbell',
+      'icon_plane',
+      'icon_medical',
+      'icon_book',
+      'icon_gift_social',
+      'icon_bolt_bill',
+      'icon_grocery_bag',
+      'icon_wallet_refund',
+      'icon_tag_default'
+    ];
+
+    const groups = [
+      {
+        title: '预置分类绑定语义图标',
+        note: '分类名来自系统预设，图标名只是背后的可复用符号',
+        items: [
+          { name: '餐饮', type: 'expense', iconKey: 'icon_bowl_chopsticks', source: '预置' },
+          { name: '交通', type: 'expense', iconKey: 'icon_vehicle', source: '预置' },
+          { name: '购物', type: 'expense', iconKey: 'icon_cart', source: '预置' },
+          { name: '通讯', type: 'expense', iconKey: 'icon_phone_bill', source: '预置' },
+          { name: '医疗', type: 'expense', iconKey: 'icon_medical', source: '预置' },
+          { name: '教育', type: 'expense', iconKey: 'icon_book', source: '预置' },
+          { name: '工资', type: 'income', iconKey: 'icon_salary_card', source: '预置' },
+          { name: '奖金', type: 'income', iconKey: 'icon_award_money', source: '预置' }
+        ]
+      },
+      {
+        title: '用户自定义复用同一套符号',
+        note: '用户看到的是自己的分类名，不会被图标选项名抢走语义',
+        items: [
+          { name: '废品回收', type: 'income', iconKey: 'icon_recycle_money', source: '新增' },
+          { name: '报销', type: 'income', iconKey: 'icon_receipt_return', source: '新增' },
+          { name: '咖啡豆', type: 'expense', iconKey: 'icon_cup', source: '新增' },
+          { name: '商业保险', type: 'expense', iconKey: 'icon_shield_check', source: '新增' },
+          { name: '买菜', type: 'expense', iconKey: 'icon_grocery_bag', source: '新增' },
+          { name: '水电燃气', type: 'expense', iconKey: 'icon_bolt_bill', source: '新增' },
+          { name: '退款', type: 'income', iconKey: 'icon_wallet_refund', source: '新增' }
+        ]
+      },
+      {
+        title: '历史 emoji 映射到语义图标',
+        note: '旧 icon 字段保留，显示层转成可复用符号',
+        items: [
+          { name: '生日红包', type: 'income', iconKey: 'icon_red_packet_money', source: '历史' },
+          { name: '二手手机', type: 'income', iconKey: 'icon_recycle_money', source: '历史' },
+          { name: '数码', type: 'expense', iconKey: 'icon_phone', source: '历史' },
+          { name: '未知旧类', type: 'expense', iconKey: 'icon_tag_default', source: '历史' }
+        ]
+      }
+    ];
+
+    const recommendRules = [
+      { key: 'icon_recycle_money', words: ['废品回收', '回收', '卖废品', '二手', '闲置', '卖掉'] },
+      { key: 'icon_receipt_return', words: ['报销', '返款', '垫付', ' reimbursement'] },
+      { key: 'icon_award_money', words: ['奖金', '奖励', '绩效', '年终奖'] },
+      { key: 'icon_red_packet_money', words: ['红包', '礼金', '生日', '份子钱'] },
+      { key: 'icon_house_savings', words: ['公积金', '住房公积金'] },
+      { key: 'icon_growth_money', words: ['投资', '股票', '基金', '理财', '利息'] },
+      { key: 'icon_briefcase_clock', words: ['副业', '兼职', '外包', '咨询'] },
+      { key: 'icon_salary_card', words: ['工资', '薪资', '薪水'] },
+      { key: 'icon_cup', words: ['咖啡', '奶茶', '饮品', '茶', '下午茶'] },
+      { key: 'icon_shield_check', words: ['保险', '保费'] },
+      { key: 'icon_camera', words: ['摄影', '相机', '拍照', '照片', '写真'] },
+      { key: 'icon_house_debt', words: ['房贷', '贷款', '按揭'] },
+      { key: 'icon_phone', words: ['数码', '手机', '电脑', '耳机', '相机'] },
+      { key: 'icon_wrench', words: ['维修', '修理', '保养'] },
+      { key: 'icon_subscription', words: ['订阅', '会员', '软件'] },
+      { key: 'icon_bowl_chopsticks', words: ['餐饮', '吃饭', '夜宵', '早餐', '午餐', '晚餐'] },
+      { key: 'icon_cart', words: ['购物', '网购', '淘宝', '京东'] },
+      { key: 'icon_phone_bill', words: ['通讯', '话费', '流量', '宽带'] },
+      { key: 'icon_baby_smile', words: ['育儿', '孩子', '奶粉', '尿布', '托育'] },
+      { key: 'icon_beauty', words: ['美容', '护肤', '化妆', '美妆', '理发'] },
+      { key: 'icon_clothes', words: ['服饰', '衣服', '鞋', '包包', '配饰'] },
+      { key: 'icon_gamepad', words: ['娱乐', '游戏', '电影', '聚会'] },
+      { key: 'icon_dumbbell', words: ['运动', '健身', '游泳', '球类'] },
+      { key: 'icon_plane', words: ['旅行', '旅游', '机票', '酒店'] },
+      { key: 'icon_medical', words: ['医疗', '药品', '门诊', '保健'] },
+      { key: 'icon_book', words: ['教育', '学习', '学费', '培训', '教材'] },
+      { key: 'icon_gift_social', words: ['人情', '礼物', '请客', '随礼'] },
+      { key: 'icon_bolt_bill', words: ['水电', '燃气', '物业', '生活缴费'] },
+      { key: 'icon_grocery_bag', words: ['买菜', '日用', '超市', '生鲜'] },
+      { key: 'icon_wallet_refund', words: ['退款', '退货', '退费'] }
+    ];
+
+    const phoneRecords = [
+      { name: '餐饮', remark: '早餐 · 小暖', type: 'expense', iconKey: 'icon_bowl_chopsticks', amount: '-¥18.00' },
+      { name: '废品回收', remark: '纸箱和旧瓶子', type: 'income', iconKey: 'icon_recycle_money', amount: '+¥28.00' },
+      { name: '报销', remark: '项目交通返款 · 小暖', type: 'income', iconKey: 'icon_receipt_return', amount: '+¥120.00' },
+      { name: '奖金', remark: '季度绩效 · 阿成', type: 'income', iconKey: 'icon_award_money', amount: '+¥2,000.00' },
+      { name: '红包礼金', remark: '春节红包 · 妈妈', type: 'income', iconKey: 'icon_red_packet_money', amount: '+¥666.00' },
+      { name: '公积金', remark: '住房公积金提取', type: 'income', iconKey: 'icon_house_savings', amount: '+¥3,200.00' },
+      { name: '投资', remark: '基金分红', type: 'income', iconKey: 'icon_growth_money', amount: '+¥88.40' },
+      { name: '副业兼职', remark: '咨询项目', type: 'income', iconKey: 'icon_briefcase_clock', amount: '+¥450.00' }
+    ];
+
+    const state = {
+      type: 'expense',
+      name: '',
+      selectedIconKey: 'icon_tag_default',
+      typeTouched: false,
+      lastPayload: {}
+    };
+
+    const categorySections = document.querySelector('#categorySections');
+    const modalMask = document.querySelector('#modalMask');
+    const categoryName = document.querySelector('#categoryName');
+    const recommendBox = document.querySelector('#recommendBox');
+    const iconOptions = document.querySelector('#iconOptions');
+    const phoneRecordList = document.querySelector('#phoneRecordList');
+    const phonePickerName = document.querySelector('#phonePickerName');
+    const phoneRecommendBox = document.querySelector('#phoneRecommendBox');
+    const phoneIconGrid = document.querySelector('#phoneIconGrid');
+    const dataPreview = document.querySelector('#dataPreview');
+    const toast = document.querySelector('#toast');
+
+    function renderIcon(iconKey, type) {
+      const icon = icons[iconKey] || icons.icon_tag_default;
+      const tone = type === 'income' ? 'income' : type === 'expense' ? 'expense' : '';
+      return `<div class="icon-frame ${tone}" aria-hidden="true"><svg viewBox="0 0 32 32">${icon.svg}</svg></div>`;
+    }
+
+    function renderSections() {
+      categorySections.innerHTML = groups.map(group => `
+        <section class="category-section">
+          <div class="section-title"><span class="dot"></span>${group.title}<span>${group.note}</span></div>
+          <div class="category-grid">
+            ${group.items.map(item => `
+              <article class="category-card ${item.added ? 'added' : ''}">
+                <span class="tag">${item.source}</span>
+                ${renderIcon(item.iconKey, item.type)}
+                <div class="category-name">${item.name}</div>
+                <div class="category-key">${item.iconKey}</div>
+              </article>
+            `).join('')}
+          </div>
+        </section>
+      `).join('');
+    }
+
+    function renderPhoneRecords() {
+      phoneRecordList.innerHTML = phoneRecords.map(record => `
+        <article class="phone-record">
+          ${renderIcon(record.iconKey, record.type)}
+          <div class="record-main">
+            <div class="record-title">${record.name}</div>
+            <div class="record-subtitle">${record.remark}</div>
+          </div>
+          <div class="record-amount ${record.type}">${record.amount}</div>
+        </article>
+      `).join('');
+    }
+
+    function renderPhoneIconPicker(selectedKey = 'icon_recycle_money', name = '废品回收') {
+      const selectedIcon = icons[selectedKey] || icons.icon_tag_default;
+      phonePickerName.textContent = name || '未命名大类';
+      phoneRecommendBox.innerHTML = `
+        ${renderIcon(selectedKey, selectedIcon.type === 'income' ? 'income' : selectedIcon.type === 'expense' ? 'expense' : 'income')}
+        <div>
+          <div class="phone-recommend-title">${selectedIcon.name}</div>
+          <div class="phone-recommend-sub">${selectedKey}</div>
+        </div>
+      `;
+      phoneIconGrid.innerHTML = iconOrder.map(key => {
+        const icon = icons[key];
+        const tone = icon.type === 'income' ? 'income' : icon.type === 'expense' ? 'expense' : '';
+        return `
+          <div class="phone-icon-option ${selectedKey === key ? 'selected' : ''}">
+            ${renderIcon(key, tone)}
+            <div class="phone-icon-label">${icon.name}</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function recommendIconKey(name) {
+      const normalized = (name || '').trim().toLowerCase();
+      if (!normalized) return 'icon_tag_default';
+      const match = recommendRules.find(rule => rule.words.some(word => normalized.includes(word.toLowerCase())));
+      return match ? match.key : 'icon_tag_default';
+    }
+
+    function syncTypeButtons() {
+      document.querySelectorAll('[data-type-choice]').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.typeChoice === state.type);
+      });
+    }
+
+    function updateRecommendation({ keepSelection = false } = {}) {
+      const autoKey = recommendIconKey(state.name);
+      if (!keepSelection) state.selectedIconKey = autoKey;
+      const icon = icons[state.selectedIconKey] || icons.icon_tag_default;
+      if (!keepSelection && !state.typeTouched && (icon.type === 'income' || icon.type === 'expense')) {
+        state.type = icon.type;
+        syncTypeButtons();
+      }
+      const autoLabel = autoKey === 'icon_tag_default' ? '未命中关键词，使用默认图标' : `根据“${state.name}”自动推荐`;
+      recommendBox.innerHTML = `
+        ${renderIcon(state.selectedIconKey, icon.type === 'income' ? 'income' : state.type)}
+        <div>
+          <strong>${icon.name} / ${state.selectedIconKey}</strong>
+          <span>${keepSelection ? '已手动选择图标，名称继续只影响推荐提示。' : autoLabel}</span>
+        </div>
+      `;
+      renderIconOptions();
+      renderPhoneIconPicker(state.selectedIconKey, state.name || '废品回收');
+    }
+
+    function renderIconOptions() {
+      iconOptions.innerHTML = iconOrder.map(key => {
+        const icon = icons[key];
+        const tone = icon.type === 'income' ? 'income' : icon.type === 'expense' ? 'expense' : state.type;
+        return `
+          <button class="icon-option ${state.selectedIconKey === key ? 'selected' : ''}" data-icon-key="${key}" type="button">
+            ${renderIcon(key, tone)}
+            <span class="icon-option-name">${icon.name}</span>
+          </button>
+        `;
+      }).join('');
+    }
+
+    function openModal() {
+      state.type = 'expense';
+      state.name = '';
+      state.selectedIconKey = 'icon_tag_default';
+      state.typeTouched = false;
+      categoryName.value = '';
+      syncTypeButtons();
+      updateRecommendation();
+      modalMask.classList.add('open');
+      setTimeout(() => categoryName.focus(), 50);
+    }
+
+    function closeModal() {
+      modalMask.classList.remove('open');
+    }
+
+    function showToast(message) {
+      toast.textContent = message;
+      toast.classList.add('show');
+      clearTimeout(showToast.timer);
+      showToast.timer = setTimeout(() => toast.classList.remove('show'), 1600);
+    }
+
+    function saveCategory() {
+      const name = state.name.trim();
+      if (!name) {
+        showToast('请输入大类名称');
+        categoryName.focus();
+        return;
+      }
+      const payload = {
+        name,
+        type: state.type,
+        iconKey: state.selectedIconKey || 'icon_tag_default',
+        icon: ''
+      };
+      groups[1].items.push({
+        name: payload.name,
+        type: payload.type,
+        iconKey: payload.iconKey,
+        source: '新增',
+        added: true
+      });
+      phoneRecords.unshift({
+        name: payload.name,
+        remark: '刚刚新增的模拟记录',
+        type: payload.type,
+        iconKey: payload.iconKey,
+        amount: payload.type === 'income' ? '+¥0.00' : '-¥0.00'
+      });
+      state.lastPayload = payload;
+      dataPreview.textContent = JSON.stringify(payload, null, 2);
+      renderSections();
+      renderPhoneRecords();
+      closeModal();
+      showToast('已添加到模拟列表');
+    }
+
+    document.querySelector('#openModal').addEventListener('click', openModal);
+    document.querySelector('#closeModal').addEventListener('click', closeModal);
+    document.querySelector('#saveCategory').addEventListener('click', saveCategory);
+    modalMask.addEventListener('click', event => {
+      if (event.target === modalMask) closeModal();
+    });
+
+    categoryName.addEventListener('input', event => {
+      state.name = event.target.value;
+      updateRecommendation();
+    });
+
+    document.querySelectorAll('[data-type-choice]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.type = btn.dataset.typeChoice;
+        state.typeTouched = true;
+        syncTypeButtons();
+        updateRecommendation({ keepSelection: true });
+      });
+    });
+
+    iconOptions.addEventListener('click', event => {
+      const option = event.target.closest('[data-icon-key]');
+      if (!option) return;
+      state.selectedIconKey = option.dataset.iconKey;
+      updateRecommendation({ keepSelection: true });
+    });
+
+    document.querySelectorAll('[data-theme-choice]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.body.dataset.theme = btn.dataset.themeChoice;
+        document.querySelectorAll('[data-theme-choice]').forEach(item => {
+          item.classList.toggle('active', item === btn);
+        });
+      });
+    });
+
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && modalMask.classList.contains('open')) closeModal();
+      if (event.key === 'Enter' && modalMask.classList.contains('open') && document.activeElement === categoryName) saveCategory();
+    });
+
+    renderSections();
+    renderPhoneRecords();
+    renderPhoneIconPicker();
+    updateRecommendation();
+  </script>
+</body>
+</html>

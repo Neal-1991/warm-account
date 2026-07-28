@@ -1,4 +1,4 @@
-<view class="summary-card" style="background: linear-gradient(135deg, #FF9500 0%, #FF6B00 100%);">
+<view class="summary-card" style="{{themeStyle}}">
   <view class="month-label">{{month}}</view>
   <view class="summary-row">
     <view class="summary-item">
