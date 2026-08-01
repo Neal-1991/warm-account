@@ -40,7 +40,8 @@ Page({
     records: [],
     recordGroups: [],
     budgetView: EMPTY_BUDGET_VIEW,
-    themeStyle: ''
+    themeStyle: '',
+    showAddActionSheet: false
   },
 
   onLoad() {
@@ -269,9 +270,30 @@ Page({
 
   async goToAdd() {
     const session = await getApp().ensureSession()
-    wx.navigateTo({
-      url: session.authenticated ? '/pages/add/add' : '/pages/login/login'
-    })
+    if (!session.authenticated) {
+      wx.navigateTo({ url: '/pages/login/login' })
+      return
+    }
+    this.setData({ showAddActionSheet: true })
+  },
+
+  closeAddActionSheet() {
+    this.setData({ showAddActionSheet: false })
+  },
+
+  goToManualAdd() {
+    this.setData({ showAddActionSheet: false })
+    wx.navigateTo({ url: '/pages/add/add' })
+  },
+
+  async goToVoiceAdd() {
+    this.setData({ showAddActionSheet: false })
+    const session = await getApp().ensureSession()
+    if (!session.authenticated) {
+      wx.navigateTo({ url: '/pages/login/login' })
+      return
+    }
+    wx.navigateTo({ url: '/pages/voice-entry/voice-entry' })
   },
 
   async goToBudget() {

@@ -4,6 +4,7 @@
     "pages/login/login",
     "pages/statistics/statistics",
     "pages/add/add",
+    "pages/voice-entry/voice-entry",
     "pages/mine/mine",
     "pages/family/family",
     "pages/about/about",
