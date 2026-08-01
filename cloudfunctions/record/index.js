@@ -9,6 +9,7 @@ const VALID_RECORD_TYPES = new Set(['expense', 'income'])
 const SECURITY_SCENE = 2
 const SECURITY_VERSION = 2
 const SECURITY_TIMEOUT_MS = 8000
+const BATCH_CREATE_MAX_ITEMS = 20
 const CONTENT_SECURITY_REJECTED = 'CONTENT_SECURITY_REJECTED'
 const CONTENT_SECURITY_UNAVAILABLE = 'CONTENT_SECURITY_UNAVAILABLE'
 const CONTENT_SECURITY_REJECTED_MESSAGE = '内容含违规信息，请修改后再试'
@@ -387,6 +388,161 @@ exports.main = async (event, context) => {
           }
         })
         return { success: true, recordId: _id, budgetAlert }
+      }
+
+      case 'batchCreate': {
+        // 语音快速记账批量写入：预校验 + 幂等 + 逐条写入 + 失败补偿删除
+        const { requestId, items } = data
+        if (!bookId) {
+          return { success: false, error: 'bookId is required' }
+        }
+        if (!requestId || typeof requestId !== 'string') {
+          return { success: false, error: 'requestId is required' }
+        }
+        if (!Array.isArray(items) || items.length === 0) {
+          return { success: false, error: 'items must be a non-empty array' }
+        }
+        if (items.length > BATCH_CREATE_MAX_ITEMS) {
+          return { success: false, error: `items cannot exceed ${BATCH_CREATE_MAX_ITEMS}` }
+        }
+
+        // 1. 幂等检查：按 voiceRequestId 查询已处理请求
+        const existingRes = await db.collection(collectionName('voiceRequests')).where({
+          openId,
+          requestId
+        }).limit(1).get()
+        const existing = existingRes.data[0]
+        if (existing && existing.status === 'completed') {
+          return {
+            success: true,
+            recordIds: existing.recordIds || [],
+            budgetAlerts: existing.budgetAlerts || [],
+            duplicate: true
+          }
+        }
+        if (existing && existing.status === 'processing') {
+          return { success: false, error: 'request is being processed', errorCode: 'DUPLICATE_REQUEST' }
+        }
+
+        // 2. 全量预校验：账本可写、每条 item 字段/分类/内容安全
+        await assertBookWritable(bookId)
+        const validatedItems = []
+        for (let i = 0; i < items.length; i++) {
+          const item = items[i]
+          if (!item.itemId || typeof item.itemId !== 'string') {
+            return { success: false, error: `items[${i}].itemId is required` }
+          }
+          if (!item.type || !item.amount || !item.categoryId || !item.date) {
+            return { success: false, error: `items[${i}] missing required fields`, failedItemIndex: i }
+          }
+          const type = assertRecordType(item.type)
+          const amount = assertPositiveAmount(item.amount)
+          const date = normalizeRecordDate(item.date)
+          const images = item.images === undefined ? [] : normalizeImages(item.images)
+          const category = await assertCategoryInBook(item.categoryId, bookId, type)
+          await assertRecordContentSafe({ remark: item.remark || '', images })
+          validatedItems.push({ item, type, amount, date, images, category })
+        }
+
+        // 3. 标记 processing（best-effort，集合不存在则跳过）
+        try {
+          await db.collection(collectionName('voiceRequests')).add({
+            data: {
+              openId,
+              requestId,
+              status: 'processing',
+              createdAt: db.serverDate()
+            }
+          })
+        } catch (markErr) {
+          console.warn('mark processing failed (non-fatal):', markErr.message)
+        }
+
+        // 4. 逐条写入 + 失败补偿删除
+        const recordIds = []
+        const budgetAlerts = []
+        const voiceRequestId = requestId
+        for (const validated of validatedItems) {
+          const { item, type, amount, date, images, category } = validated
+          let budgetAlert = null
+          if (type === 'expense') {
+            try {
+              budgetAlert = await prepareBudgetAlert(category, amount, date)
+            } catch (budgetError) {
+              console.error('prepare budget alert failed:', budgetError)
+            }
+          }
+          let newId
+          try {
+            const addRes = await db.collection(collectionName('records')).add({
+              data: {
+                bookId,
+                type,
+                amount,
+                categoryId: item.categoryId,
+                date,
+                remark: item.remark || '',
+                images,
+                source: 'voice',
+                voiceRequestId,
+                voiceItemId: item.itemId,
+                createdBy: openId,
+                createdByName: data.nickName || '未知',
+                createdAt: db.serverDate(),
+                updatedBy: openId,
+                updatedByName: data.nickName || '未知',
+                updatedAt: db.serverDate()
+              }
+            })
+            newId = addRes._id
+            recordIds.push(newId)
+            budgetAlerts.push(budgetAlert)
+          } catch (writeErr) {
+            // 失败补偿删除：回滚已写入的记录
+            console.error('batchCreate write failed at index', recordIds.length, writeErr)
+            const orphanIds = []
+            for (const rollbackId of recordIds) {
+              try {
+                await db.collection(collectionName('records')).doc(rollbackId).remove()
+              } catch (rollbackErr) {
+                orphanIds.push(rollbackId)
+                console.error('compensate delete failed for', rollbackId, rollbackErr)
+              }
+            }
+            // 更新请求状态为 failed
+            try {
+              await db.collection(collectionName('voiceRequests')).where({ openId, requestId }).update({
+                data: { status: 'failed', failedAt: recordIds.length, orphanIds, updatedAt: db.serverDate() }
+              })
+            } catch (updateErr) {
+              console.warn('update voiceRequests failed (non-fatal):', updateErr.message)
+            }
+            if (orphanIds.length > 0) {
+              return {
+                success: false,
+                error: '批量写入失败，部分记录需要人工核对',
+                errorCode: 'PARTIAL_ROLLBACK_INCOMPLETE',
+                orphanIds
+              }
+            }
+            return {
+              success: false,
+              error: '批量写入失败，已回滚全部记录',
+              errorCode: 'BATCH_ROLLED_BACK'
+            }
+          }
+        }
+
+        // 5. 标记 completed
+        try {
+          await db.collection(collectionName('voiceRequests')).where({ openId, requestId }).update({
+            data: { status: 'completed', recordIds, budgetAlerts, updatedAt: db.serverDate() }
+          })
+        } catch (updateErr) {
+          console.warn('mark completed failed (non-fatal):', updateErr.message)
+        }
+
+        return { success: true, recordIds, budgetAlerts }
       }
 
       case 'get': {
