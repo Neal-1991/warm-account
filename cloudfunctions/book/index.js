@@ -37,7 +37,9 @@ exports.main = async (event, context) => {
   const assertBookOwner = async (id) => {
     const book = await getBook(id)
     if (!book || book.ownerId !== openId) {
-      throw new Error('permission denied')
+      const err = new Error('permission denied')
+      err.code = 'PERMISSION_DENIED'
+      throw err
     }
     return book
   }
@@ -238,6 +240,100 @@ exports.main = async (event, context) => {
           openId,
           inviteCode: code
         })
+      }
+
+      case 'removeMember': {
+        const { targetOpenId } = event
+        if (!bookId || !targetOpenId) {
+          return { success: false, error: 'bookId and targetOpenId are required' }
+        }
+        const book = await assertBookOwner(bookId)
+        if (targetOpenId === openId) {
+          const err = new Error('cannot remove owner')
+          err.code = 'CANNOT_REMOVE_OWNER'
+          throw err
+        }
+        if (book.joinMigration) {
+          const err = new Error('join migration in progress')
+          err.code = 'JOIN_MIGRATION_IN_PROGRESS'
+          throw err
+        }
+        if (!(book.memberIds || []).includes(targetOpenId)) {
+          const err = new Error('member not found')
+          err.code = 'MEMBER_NOT_FOUND'
+          throw err
+        }
+        await db.runTransaction(async transaction => {
+          await transaction.collection(collectionName('books')).doc(bookId).update({
+            data: {
+              memberIds: _.pull(targetOpenId),
+              formerMemberIds: _.addToSet(targetOpenId),
+              updatedAt: db.serverDate()
+            }
+          })
+        })
+        return { success: true }
+      }
+
+      case 'transferOwnership': {
+        const { targetOpenId } = event
+        if (!bookId || !targetOpenId) {
+          return { success: false, error: 'bookId and targetOpenId are required' }
+        }
+        const book = await assertBookOwner(bookId)
+        if (targetOpenId === openId) {
+          const err = new Error('cannot transfer to self')
+          err.code = 'CANNOT_TRANSFER_TO_SELF'
+          throw err
+        }
+        if (!(book.memberIds || []).includes(targetOpenId)) {
+          const err = new Error('target not member')
+          err.code = 'TARGET_NOT_MEMBER'
+          throw err
+        }
+        if (book.joinMigration) {
+          const err = new Error('join migration in progress')
+          err.code = 'JOIN_MIGRATION_IN_PROGRESS'
+          throw err
+        }
+        const ownerMembers = await db.collection(collectionName('members'))
+          .where({ openId })
+          .limit(1)
+          .get()
+        const fromNickName = ownerMembers.data[0]?.nickName || '微信用户'
+        await db.runTransaction(async transaction => {
+          await transaction.collection(collectionName('books')).doc(bookId).update({
+            data: {
+              ownerId: targetOpenId,
+              transferNotice: {
+                fromOpenId: openId,
+                fromNickName,
+                transferredAt: new Date()
+              },
+              updatedAt: db.serverDate()
+            }
+          })
+        })
+        return { success: true }
+      }
+
+      case 'acknowledgeTransfer': {
+        if (!bookId) {
+          return { success: false, error: 'bookId is required' }
+        }
+        const book = await assertBookOwner(bookId)
+        if (!book.transferNotice) {
+          const err = new Error('no transfer notice')
+          err.code = 'NO_TRANSFER_NOTICE'
+          throw err
+        }
+        await db.collection(collectionName('books')).doc(bookId).update({
+          data: {
+            transferNotice: _.remove(),
+            updatedAt: db.serverDate()
+          }
+        })
+        return { success: true }
       }
 
       default:

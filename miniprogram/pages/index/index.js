@@ -61,11 +61,67 @@ Page({
   onShow() {
     this.setData({ themeStyle: getApp().getThemeStyle() })
     getApp().applyTheme()
+    this.checkRemovedNotice()
+    this.checkTransferredNotice()
     if (this._skipNextShow) {
       this._skipNextShow = false
       return
     }
     this.loadData()
+  },
+
+  checkRemovedNotice() {
+    const removedBookName = wx.getStorageSync('removedBookName')
+    if (!removedBookName) return
+    wx.removeStorageSync('removedBookName')
+    const app = getApp()
+    wx.showModal({
+      title: '你已被移出家庭账本',
+      content: `你已被移出「${removedBookName}」，历史记录保留在该账本中。将为你创建新的个人账本。`,
+      showCancel: false,
+      confirmText: '知道了',
+      success: () => {
+        wx.cloud.callFunction({
+          name: 'login',
+          data: { isTest: config.isTest }
+        }).then(res => {
+          if (res.result && res.result.success && res.result.bookId) {
+            app.setBookId(res.result.bookId)
+            app._sessionResult = null
+            this.loadData()
+          }
+        }).catch(err => {
+          console.error('create new book after removal failed:', err)
+        })
+      }
+    })
+  },
+
+  checkTransferredNotice() {
+    const transferNotice = wx.getStorageSync('transferNotice')
+    if (!transferNotice) return
+    wx.removeStorageSync('transferNotice')
+    const app = getApp()
+    const bookId = app.getBookId()
+    wx.showModal({
+      title: '账本所有权已转给你',
+      content: `「${transferNotice.fromNickName || '原管理员'}」已将家庭账本的所有权转给你，你现在是管理员。`,
+      showCancel: false,
+      confirmText: '知道了',
+      success: () => {
+        if (!bookId) return
+        wx.cloud.callFunction({
+          name: 'book',
+          data: {
+            action: 'acknowledgeTransfer',
+            bookId,
+            isTest: config.isTest
+          }
+        }).catch(err => {
+          console.error('acknowledgeTransfer failed:', err)
+        })
+      }
+    })
   },
 
   onMonthChange(e) {

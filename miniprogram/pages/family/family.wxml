@@ -20,12 +20,23 @@
           <text class="member-name">{{item.nickName}}</text>
           <text class="member-role">{{item.role === 'admin' ? '管理员' : '成员'}}</text>
         </view>
-        <text
-          class="remove-btn"
-          wx:if="{{false}}"
-          bindtap="removeMember"
-          data-openid="{{item.openId}}"
-        >移除</text>
+        <view class="member-actions" wx:if="{{isAdmin && !item.isFormer && item.openId !== currentOpenId}}">
+          <text class="transfer-btn" bindtap="transferOwnership" data-openid="{{item.openId}}" data-name="{{item.nickName}}">转让</text>
+          <text class="remove-btn" bindtap="removeMember" data-openid="{{item.openId}}" data-name="{{item.nickName}}">移除</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="former-member-section" wx:if="{{formerMembers.length > 0}}">
+    <text class="section-title former-section-title">已退出成员</text>
+    <view class="member-list">
+      <view class="member-item former-member-item" wx:for="{{formerMembers}}" wx:key="openId">
+        <image class="member-avatar" src="{{item.avatarUrl || '/images/default-avatar.png'}}" />
+        <view class="member-info">
+          <text class="member-name">{{item.nickName}}</text>
+          <text class="former-tag">已退出</text>
+        </view>
       </view>
     </view>
   </view>

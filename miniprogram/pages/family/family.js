@@ -10,6 +10,7 @@ Page({
     inviteCode: '',
     inviteCodeExpire: null,
     members: [],
+    formerMembers: [],
     currentOpenId: '',
     isAdmin: false,
     // dialog
@@ -103,13 +104,14 @@ Page({
           isAdmin,
           bookOwnerId: book.ownerId
         })
-        this.loadMembers(book.memberIds || [])
+        this.loadMembers(book.memberIds || [], book.formerMemberIds || [])
       } else {
         this.setData({
           bookName: '',
           inviteCode: '',
           inviteCodeExpire: null,
           members: [],
+          formerMembers: [],
           isAdmin: false
         })
       }
@@ -118,17 +120,19 @@ Page({
     })
   },
 
-  loadMembers(memberIds) {
+  loadMembers(memberIds, formerMemberIds) {
     const app = getApp()
     const currentOpenId = app.getOpenId()
     const bookOwnerId = this.data.bookOwnerId
+    const safeFormerIds = formerMemberIds || []
 
-    // 批量查询成员的真实昵称和头像
+    // 批量查询成员（含已退出成员）的真实昵称和头像
     wx.cloud.callFunction({
       name: 'login',
       data: {
         action: 'getMembers',
         memberIds,
+        formerMemberIds: safeFormerIds,
         isTest: config.isTest
       }
     }).then(res => {
@@ -136,7 +140,7 @@ Page({
       const memberMap = {}
       membersData.forEach(m => { memberMap[m.openId] = m })
 
-      const members = memberIds.map(openId => {
+      const buildEntry = openId => {
         const profile = memberMap[openId]
         const isSelf = openId === currentOpenId
         return {
@@ -145,9 +149,16 @@ Page({
           avatarUrl: profile?.avatarUrl || '',
           role: openId === bookOwnerId ? 'admin' : 'member'
         }
+      }
+
+      const members = memberIds.map(buildEntry)
+      const formerMembers = safeFormerIds.map(openId => {
+        const entry = buildEntry(openId)
+        entry.isFormer = true
+        return entry
       })
 
-      this.setData({ members })
+      this.setData({ members, formerMembers })
     }).catch(err => {
       console.error('loadMembers error:', err)
       // fallback
@@ -157,7 +168,14 @@ Page({
         avatarUrl: '',
         role: openId === bookOwnerId ? 'admin' : 'member'
       }))
-      this.setData({ members })
+      const formerMembers = safeFormerIds.map((openId, index) => ({
+        openId,
+        nickName: `成员${memberIds.length + index + 1}`,
+        avatarUrl: '',
+        role: openId === bookOwnerId ? 'admin' : 'member',
+        isFormer: true
+      }))
+      this.setData({ members, formerMembers })
     })
   },
 
@@ -412,14 +430,104 @@ Page({
 
   removeMember(e) {
     const openId = e.currentTarget.dataset.openid
+    const nickName = e.currentTarget.dataset.name || '该成员'
+    const app = getApp()
+    const bookId = app.getBookId()
+    if (!bookId) {
+      wx.showToast({ title: '账本信息缺失', icon: 'none' })
+      return
+    }
     wx.showModal({
       title: '确认移除',
-      content: '确定要移除该成员吗？',
+      content: `确定要移除「${nickName}」吗？该成员的历史记录将保留在家庭账本中。`,
+      confirmText: '移除',
+      confirmColor: '#e64340',
       success: res => {
-        if (res.confirm) {
-          wx.showToast({ title: '移除功能开发中', icon: 'none' })
-        }
+        if (!res.confirm) return
+        wx.showLoading({ title: '移除中...', mask: true })
+        wx.cloud.callFunction({
+          name: 'book',
+          data: {
+            action: 'removeMember',
+            bookId,
+            targetOpenId: openId,
+            isTest: config.isTest
+          }
+        }).then(res => {
+          wx.hideLoading()
+          if (res.result && res.result.success) {
+            wx.showToast({ title: '已移除', icon: 'success' })
+            this.loadData()
+          } else {
+            this.showRemoveError(res.result?.errorCode)
+          }
+        }).catch(err => {
+          wx.hideLoading()
+          console.error('removeMember error:', err)
+          wx.showToast({ title: '移除失败', icon: 'none' })
+        })
       }
     })
+  },
+
+  showRemoveError(errorCode) {
+    const messages = {
+      PERMISSION_DENIED: '没有权限',
+      CANNOT_REMOVE_OWNER: '不能移除管理员',
+      MEMBER_NOT_FOUND: '该成员已不在账本中',
+      JOIN_MIGRATION_IN_PROGRESS: '有成员正在加入,请稍后再试'
+    }
+    wx.showToast({ title: messages[errorCode] || '移除失败', icon: 'none' })
+  },
+
+  transferOwnership(e) {
+    const targetOpenId = e.currentTarget.dataset.openid
+    const nickName = e.currentTarget.dataset.name || '该成员'
+    const app = getApp()
+    const bookId = app.getBookId()
+    if (!bookId) {
+      wx.showToast({ title: '账本信息缺失', icon: 'none' })
+      return
+    }
+    wx.showModal({
+      title: '转让所有权',
+      content: `确定将账本所有权转给「${nickName}」吗？你将变为普通成员。`,
+      confirmText: '转让',
+      success: res => {
+        if (!res.confirm) return
+        wx.showLoading({ title: '转让中...', mask: true })
+        wx.cloud.callFunction({
+          name: 'book',
+          data: {
+            action: 'transferOwnership',
+            bookId,
+            targetOpenId,
+            isTest: config.isTest
+          }
+        }).then(res => {
+          wx.hideLoading()
+          if (res.result && res.result.success) {
+            wx.showToast({ title: '已转让', icon: 'success' })
+            this.loadData()
+          } else {
+            this.showTransferError(res.result?.errorCode)
+          }
+        }).catch(err => {
+          wx.hideLoading()
+          console.error('transferOwnership error:', err)
+          wx.showToast({ title: '转让失败', icon: 'none' })
+        })
+      }
+    })
+  },
+
+  showTransferError(errorCode) {
+    const messages = {
+      PERMISSION_DENIED: '没有权限',
+      CANNOT_TRANSFER_TO_SELF: '不能转给自己',
+      TARGET_NOT_MEMBER: '该成员已不在账本中',
+      JOIN_MIGRATION_IN_PROGRESS: '有成员正在加入,请稍后再试'
+    }
+    wx.showToast({ title: messages[errorCode] || '转让失败', icon: 'none' })
   }
 })

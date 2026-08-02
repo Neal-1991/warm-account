@@ -73,7 +73,12 @@ App({
       }
       if (!result.authenticated) {
         this.clearSession()
-        this._sessionResult = { authenticated: false }
+        if (result.removed) {
+          wx.setStorageSync('removedBookName', result.removedBookName || '家庭账本')
+          this._sessionResult = { authenticated: false, removed: true, removedBookName: result.removedBookName }
+        } else {
+          this._sessionResult = { authenticated: false }
+        }
         return this._sessionResult
       }
 
@@ -83,6 +88,12 @@ App({
         userInfo: result.userInfo || localSession.userInfo,
         themeId: result.userInfo?.preferences?.themeId || localSession.themeId
       })
+      if (result.transferred) {
+        wx.setStorageSync('transferNotice', {
+          fromNickName: result.fromNickName,
+          transferredAt: result.transferredAt
+        })
+      }
       this._sessionResult = {
         authenticated: true,
         openId: this.globalData.openId,

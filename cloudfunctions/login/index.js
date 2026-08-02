@@ -51,6 +51,20 @@ exports.main = async (event, context) => {
         .where(_.or([{ ownerId: openId }, { memberIds: openId }]))
         .get()
       if (books.data.length === 0) {
+        // 检测是否曾属于某账本但已被移除（出现在 formerMemberIds 中）
+        const formerBooks = await db.collection(collectionName('books'))
+          .where({ formerMemberIds: openId })
+          .limit(1)
+          .get()
+        if (formerBooks.data.length > 0) {
+          return {
+            success: true,
+            authenticated: false,
+            removed: true,
+            removedBookName: formerBooks.data[0].name || '家庭账本',
+            openId
+          }
+        }
         return { success: true, authenticated: false, openId }
       }
 
@@ -76,13 +90,20 @@ exports.main = async (event, context) => {
         ).catch(() => userInfo.avatarUrl)
       }
 
-      return {
+      // 检测当前用户是账本 ownerId 且账本存在 transferNotice（所有权已转给该用户）
+      const result = {
         success: true,
         authenticated: true,
         openId,
         bookId: activeBook._id,
         userInfo
       }
+      if (activeBook.transferNotice && activeBook.ownerId === openId) {
+        result.transferred = true
+        result.fromNickName = activeBook.transferNotice.fromNickName
+        result.transferredAt = activeBook.transferNotice.transferredAt
+      }
+      return result
     }
 
     // profile update (called from mine page)
@@ -175,8 +196,10 @@ exports.main = async (event, context) => {
 
     // batch query member profiles (called from family page)
     if (action === 'getMembers') {
-      const { memberIds } = event
-      if (!Array.isArray(memberIds) || memberIds.length === 0) {
+      const { memberIds, formerMemberIds } = event
+      const normalizedMemberIds = Array.isArray(memberIds) ? memberIds : []
+      const normalizedFormerMemberIds = Array.isArray(formerMemberIds) ? formerMemberIds : []
+      if (normalizedMemberIds.length === 0 && normalizedFormerMemberIds.length === 0) {
         return { success: true, members: [] }
       }
 
@@ -189,15 +212,19 @@ exports.main = async (event, context) => {
         if (book.ownerId) {
           allowedMemberIds.add(book.ownerId)
         }
+        ;(book.formerMemberIds || []).forEach(id => allowedMemberIds.add(id))
       })
 
-      const safeMemberIds = memberIds.filter(id => allowedMemberIds.has(id))
-      if (safeMemberIds.length === 0) {
+      const safeMemberIds = normalizedMemberIds.filter(id => allowedMemberIds.has(id))
+      const safeFormerMemberIds = normalizedFormerMemberIds.filter(id => allowedMemberIds.has(id))
+      const allSafeIds = Array.from(new Set([...safeMemberIds, ...safeFormerMemberIds]))
+      if (allSafeIds.length === 0) {
         return { success: true, members: [] }
       }
 
+      const formerIdSet = new Set(safeFormerMemberIds)
       const members = await db.collection(collectionName('members'))
-        .where({ openId: _.in(safeMemberIds) })
+        .where({ openId: _.in(allSafeIds) })
         .get()
 
       // 将 cloud:// 头像路径转为临时 URL（跨用户访问需要云函数管理员权限）
@@ -213,6 +240,13 @@ exports.main = async (event, context) => {
           console.error('getMembers getTempFileURL error:', e)
         }
       }
+
+      // 标记已退出成员
+      results.forEach(m => {
+        if (formerIdSet.has(m.openId)) {
+          m.isFormer = true
+        }
+      })
 
       return { success: true, members: results }
     }
