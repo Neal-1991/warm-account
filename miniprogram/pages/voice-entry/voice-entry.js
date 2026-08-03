@@ -98,7 +98,19 @@ Page({
     this.recorderManager.onError((err) => {
       this.clearTimers()
       console.error('recorder error:', err)
-      this.setData({ stage: 'error', errorMessage: '录音失败，请检查麦克风权限' })
+      const errMsg = String(err?.errMsg || err?.message || err || '')
+      // 权限拒绝通常包含 "auth" 或 "permission" 或 "deny"
+      if (/auth|permission|deny|拒绝/i.test(errMsg)) {
+        this.setData({
+          stage: 'error',
+          errorMessage: '麦克风权限被拒绝，请在微信设置中开启后重试'
+        })
+      } else {
+        this.setData({
+          stage: 'error',
+          errorMessage: '录音失败，请检查麦克风权限或重新录音'
+        })
+      }
     })
   },
 
@@ -125,17 +137,14 @@ Page({
         }
         return false
       }
-      // 从未问过 → 主动触发授权弹窗
-      return new Promise(resolve => {
-        wx.authorize({
-          scope: 'scope.record',
-          success: () => resolve(true),
-          fail: () => resolve(false)
-        })
-      })
+      // 从未问过 → 返回 true，由 recorderManager.start() 自动触发系统授权弹窗
+      // 注意：wx.authorize 在开发者工具里对 scope.record 经常不弹窗，
+      // 而 recorderManager.start() 本身会触发授权弹窗，更可靠
+      return true
     } catch (err) {
       console.error('checkMicPermission failed:', err)
-      return false
+      // 出错时仍尝试录音，让 recorderManager 触发授权
+      return true
     }
   },
 
@@ -155,6 +164,7 @@ Page({
       return
     }
     this.setData({ stage: 'recording', recordingSeconds: 0, transcript: '', items: [], errorMessage: '' })
+    // recorderManager.start() 在未授权时会自动触发系统授权弹窗
     this.recorderManager.start({
       duration: MAX_RECORD_MS,
       sampleRate: SAMPLE_RATE,
