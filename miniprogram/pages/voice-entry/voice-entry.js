@@ -105,22 +105,37 @@ Page({
   async checkMicPermission() {
     try {
       const setting = await wx.getSetting()
-      if (setting.authSetting['scope.record'] === false) {
-        wx.showModal({
-          title: '需要麦克风权限',
-          content: '语音记账需要使用麦克风，请在设置中开启',
-          confirmText: '去设置',
-          success: (res) => {
-            if (res.confirm) wx.openSetting()
-          }
+      const recordAuth = setting.authSetting['scope.record']
+      // 已授权
+      if (recordAuth === true) return true
+      // 明确拒绝过 → 引导去设置
+      if (recordAuth === false) {
+        const confirmed = await new Promise(resolve => {
+          wx.showModal({
+            title: '需要麦克风权限',
+            content: '语音记账需要使用麦克风，请在设置中开启',
+            confirmText: '去设置',
+            success: (res) => resolve(res.confirm),
+            fail: () => resolve(false)
+          })
         })
+        if (confirmed) {
+          const settingRes = await wx.openSetting()
+          return settingRes.authSetting['scope.record'] === true
+        }
         return false
       }
-      // 未授权过会走 undefined，授权过 true 直接放行
-      return true
+      // 从未问过 → 主动触发授权弹窗
+      return new Promise(resolve => {
+        wx.authorize({
+          scope: 'scope.record',
+          success: () => resolve(true),
+          fail: () => resolve(false)
+        })
+      })
     } catch (err) {
-      console.error('getSetting failed:', err)
-      return true // 不阻塞，让 recorder 自己触发授权
+      console.error('checkMicPermission failed:', err)
+      return false
     }
   },
 
@@ -132,7 +147,13 @@ Page({
       return
     }
     const ok = await this.checkMicPermission()
-    if (!ok) return
+    if (!ok) {
+      this.setData({
+        stage: 'error',
+        errorMessage: '需要麦克风权限才能录音，请在设置中开启后重试'
+      })
+      return
+    }
     this.setData({ stage: 'recording', recordingSeconds: 0, transcript: '', items: [], errorMessage: '' })
     this.recorderManager.start({
       duration: MAX_RECORD_MS,

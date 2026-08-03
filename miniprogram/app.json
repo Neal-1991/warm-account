@@ -29,5 +29,11 @@
     "navigationBarTitleText": "暖账",
     "navigationBarTextStyle": "white",
     "viewport-fit": "cover"
-  }
+  },
+  "permission": {
+    "scope.record": {
+      "desc": "用于语音记账功能，识别你的语音内容生成记账草稿"
+    }
+  },
+  "requiredPrivateInfos": []
 }
