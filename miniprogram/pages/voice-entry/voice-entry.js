@@ -437,10 +437,10 @@ Page({
           bookId,
           data: {
             requestId: this.data.requestId,
-            items
+            items,
+            nickName: userInfo.nickName
           },
-          isTest: config.isTest,
-          nickName: userInfo.nickName
+          isTest: config.isTest
         }
       })
       const result = res.result

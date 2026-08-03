@@ -40,7 +40,6 @@ function buildSignedHeaders(payload, secretId, secretKey) {
     'POST',
     '/',
     '',
-    '',
     'content-type:application/json; charset=utf-8',
     'host:' + ASR_ENDPOINT,
     '',

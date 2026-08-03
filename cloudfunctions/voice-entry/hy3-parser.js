@@ -1,10 +1,9 @@
 // cloudfunctions/voice-entry/hy3-parser.js
 // Hy3 兜底解析：通过 CloudBase SDK 调用 hunyuan-v3 provider
 // 只返回固定 JSON，服务端二次校验
+// cloud.init 由 voice-entry/index.js 统一完成，此处不重复
 
 const cloud = require('wx-server-sdk')
-
-cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const SYSTEM_PROMPT = `你是一个家庭记账解析助手。用户会说一句或多句关于收支的话，你需要把它解析成结构化记账草稿。
 
