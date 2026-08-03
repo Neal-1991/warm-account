@@ -35,5 +35,10 @@
       "desc": "用于语音记账功能，识别你的语音内容生成记账草稿"
     }
   },
-  "requiredPrivateInfos": []
+  "requiredPrivateInfos": [],
+  "__usePrivacyCheck__": true,
+  "__privacySetting__": {
+    "privacyContractName": "用户隐私保护指引",
+    "apis": ["scope.record"]
+  }
 }

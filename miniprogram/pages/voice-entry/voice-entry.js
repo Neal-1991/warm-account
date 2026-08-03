@@ -97,7 +97,7 @@ Page({
 
     this.recorderManager.onError((err) => {
       this.clearTimers()
-      console.error('recorder error:', err)
+      console.error('[voice-entry] recorder onError:', JSON.stringify(err), err)
       const errMsg = String(err?.errMsg || err?.message || err || '')
       // 权限拒绝通常包含 "auth" 或 "permission" 或 "deny"
       if (/auth|permission|deny|拒绝/i.test(errMsg)) {
@@ -108,20 +108,54 @@ Page({
       } else {
         this.setData({
           stage: 'error',
-          errorMessage: '录音失败，请检查麦克风权限或重新录音'
+          errorMessage: '录音失败：' + errMsg.slice(0, 50)
         })
       }
     })
   },
 
+  // 隐私协议授权（微信新隐私协议要求，基础库 2.32.3+ 必须先同意才能用敏感 API）
+  requirePrivacyAuthorize() {
+    return new Promise(resolve => {
+      if (typeof wx.requirePrivacyAuthorize !== 'function') {
+        // 旧基础库没有此 API，直接放行
+        console.log('[voice-entry] wx.requirePrivacyAuthorize not available, skip')
+        resolve(true)
+        return
+      }
+      wx.requirePrivacyAuthorize({
+        success: () => {
+          console.log('[voice-entry] privacy authorize success')
+          resolve(true)
+        },
+        fail: (err) => {
+          console.log('[voice-entry] privacy authorize fail:', err)
+          resolve(false)
+        }
+      })
+    })
+  },
+
   async checkMicPermission() {
+    // 1. 先过隐私协议（微信新规：scope.record 必须先同意隐私协议）
+    const privacyOk = await this.requirePrivacyAuthorize()
+    if (!privacyOk) {
+      console.log('[voice-entry] privacy not authorized, abort')
+      return false
+    }
+
     try {
       const setting = await wx.getSetting()
       const recordAuth = setting.authSetting['scope.record']
+      console.log('[voice-entry] checkMicPermission authSetting:', setting.authSetting, 'recordAuth:', recordAuth)
       // 已授权
-      if (recordAuth === true) return true
+      if (recordAuth === true) {
+        console.log('[voice-entry] permission already granted')
+        return true
+      }
       // 明确拒绝过 → 引导去设置
       if (recordAuth === false) {
+        console.log('[voice-entry] permission denied before, guide to setting')
         const confirmed = await new Promise(resolve => {
           wx.showModal({
             title: '需要麦克风权限',
@@ -133,22 +167,23 @@ Page({
         })
         if (confirmed) {
           const settingRes = await wx.openSetting()
-          return settingRes.authSetting['scope.record'] === true
+          const granted = settingRes.authSetting['scope.record'] === true
+          console.log('[voice-entry] openSetting result:', granted)
+          return granted
         }
         return false
       }
-      // 从未问过 → 返回 true，由 recorderManager.start() 自动触发系统授权弹窗
-      // 注意：wx.authorize 在开发者工具里对 scope.record 经常不弹窗，
-      // 而 recorderManager.start() 本身会触发授权弹窗，更可靠
+      // 从未问过 → 返回 true，由 recorderManager.start() 触发系统授权弹窗
+      console.log('[voice-entry] permission not asked, recorderManager.start() will trigger')
       return true
     } catch (err) {
-      console.error('checkMicPermission failed:', err)
-      // 出错时仍尝试录音，让 recorderManager 触发授权
+      console.error('[voice-entry] checkMicPermission failed:', err)
       return true
     }
   },
 
   async startRecording() {
+    console.log('[voice-entry] startRecording called')
     const app = getApp()
     const session = await app.ensureSession()
     if (!session.authenticated) {
@@ -156,6 +191,7 @@ Page({
       return
     }
     const ok = await this.checkMicPermission()
+    console.log('[voice-entry] checkMicPermission result:', ok)
     if (!ok) {
       this.setData({
         stage: 'error',
@@ -164,6 +200,7 @@ Page({
       return
     }
     this.setData({ stage: 'recording', recordingSeconds: 0, transcript: '', items: [], errorMessage: '' })
+    console.log('[voice-entry] calling recorderManager.start()')
     // recorderManager.start() 在未授权时会自动触发系统授权弹窗
     this.recorderManager.start({
       duration: MAX_RECORD_MS,
