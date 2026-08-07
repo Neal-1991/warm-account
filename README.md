@@ -5,11 +5,14 @@
 ## 功能
 
 - 日常收支记录（支出/收入）
-- 分类管理（9 个支出大类 + 7 个收入大类，支持自定义小类）
+- 分类管理（16 个支出大类 + 7 个收入大类，支持自定义小类）
 - 月度统计环形饼图
 - 图片上传与查看（最多 9 张/条）
 - 家庭协作：邀请码制，成员共享账本
 - 游客模式：未登录可浏览界面
+- 语音快速记账：按住说话录音→ASR 识别→智能解析→多笔预览→批量确认
+- 月度预算管理：总预算、分类预算、预算进度、超支提醒
+- 家庭成员管理：管理员可移除成员、转让账本所有权
 
 ## 技术栈
 
@@ -58,6 +61,10 @@ module.exports = {
 | `records_prod` | 记账记录 |
 | `categories_prod` | 分类 |
 | `members_prod` | 成员信息 |
+| `budgets_prod` | 预算 |
+| `voiceRequests_prod` | 语音记账请求 |
+
+`voiceRequests_prod` 需创建 `openId` + `requestId` 组合唯一索引。
 
 如需测试环境，将 `config.js` 中 `isTest` 改为 `true`，并创建对应 `_test` 后缀集合。
 
@@ -78,19 +85,25 @@ const isTest = false  // 生产环境
 │   ├── book/                 #   账本 CRUD + 邀请码
 │   ├── record/               #   记账记录 CRUD
 │   ├── category/             #   分类管理
+│   ├── budget/               #   预算管理
+│   ├── voice-entry/          #   ASR 语音识别 + Hy3 AI 解析
 │   ├── init-database/        #   初始化默认分类
-│   └── init-collections/     #   数据库集合说明
+│   ├── init-collections/     #   数据库集合说明
+│   └── clear-test-data/      #   清理测试数据
 ├── miniprogram/              # 前端
-│   ├── pages/                #   8 个页面
+│   ├── pages/                #   11 个页面
 │   │   ├── index/            #     首页：月份选择、汇总卡片、记录列表
 │   │   ├── add/              #     记一笔：金额/分类/日期/备注/图片
+│   │   ├── voice-entry/      #     语音记账：录音、ASR、多笔预览
 │   │   ├── statistics/       #     统计：ECharts 饼图 + 图例
 │   │   ├── mine/             #     我的：头像昵称、家庭管理
 │   │   ├── family/           #     家庭：邀请码、成员列表
+│   │   ├── budget/           #     预算管理：总预算、分类预算、进度
+│   │   ├── category-manage/  #     分类管理：大类/小类增删改
 │   │   ├── login/            #     登录：微信授权
 │   │   ├── about/            #     关于：版本、协议
 │   │   └── detail/           #     记录详情：图片预览、删除
-│   ├── components/           #   5 个可复用组件
+│   ├── components/           #   6 个可复用组件
 │   └── utils/                #   工具函数 + ECharts
 └── project.config.json       # 微信开发者工具配置
 ```
