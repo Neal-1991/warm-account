@@ -3,7 +3,7 @@ const cloud = require('wx-server-sdk')
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const db = cloud.database()
 
-const COLLECTIONS = ['books', 'records', 'categories', 'members', 'budgets']
+const COLLECTIONS = ['books', 'records', 'categories', 'members', 'budgets', 'voiceRequests']
 const PRODUCTION_CONFIRMATION = 'RESET_WARM_ACCOUNT_PRODUCTION'
 
 // 获取集合全部数据（支持超过 100 条的分页）

@@ -1,5 +1,6 @@
 // miniprogram/pages/voice-entry/voice-entry.js
 const config = require('../../utils/config')
+const { budgetAlertContent } = require('../../utils/budget')
 
 const MAX_RECORD_MS = 30000
 const SAMPLE_RATE = 16000
@@ -37,7 +38,12 @@ Page({
     categories: [],
     expandedItemId: null,
     canConfirm: false,
-    successCount: 0
+    successCount: 0,
+    wantCancel: false,
+    holdBtnText: '按住说话',
+    showCategoryPicker: false,
+    pickerType: 'expense',
+    pickerTargetItemId: null
   },
 
   onLoad() {
@@ -51,6 +57,7 @@ Page({
     app.applyTheme()
     this.recorderManager = wx.getRecorderManager()
     this.bindRecorderEvents()
+    this.prepareForRecording()
   },
 
   onShow() {
@@ -81,18 +88,42 @@ Page({
         const next = this.data.recordingSeconds + 1
         this.setData({ recordingSeconds: next })
         if (next * 1000 >= MAX_RECORD_MS) {
-          this.stopRecording()
+          // 30 秒自动停止：清定时器 + 调 recorderManager.stop，走 onStop 回调
+          this.clearTimers()
+          this.recorderManager.stop()
         }
       }, 1000)
     })
 
     this.recorderManager.onStop((res) => {
       this.clearTimers()
-      if (!res || !res.duration || res.duration < 300) {
-        this.setData({ stage: 'error', errorMessage: '录音过短，请重新录音' })
+      // 防重入：onStop 可能被多次回调（30秒自动停止 + 手动停止重叠时）
+      if (this._processingStop) return
+      this._processingStop = true
+      if (this._cancelled) {
+        this._cancelled = false
+        this._processingStop = false
+        this.setData({
+          stage: 'idle',
+          wantCancel: false,
+          holdBtnText: '按住说话',
+          transcript: '',
+          items: []
+        })
         return
       }
-      this.uploadAndRecognize(res.tempFilePath)
+      if (!res || !res.duration || res.duration < 300) {
+        this._processingStop = false
+        this.setData({
+          stage: 'error',
+          errorMessage: '录音过短，请重新录音',
+          holdBtnText: '按住说话'
+        })
+        return
+      }
+      this.uploadAndRecognize(res.tempFilePath).finally(() => {
+        this._processingStop = false
+      })
     })
 
     this.recorderManager.onError((err) => {
@@ -103,12 +134,14 @@ Page({
       if (/auth|permission|deny|拒绝/i.test(errMsg)) {
         this.setData({
           stage: 'error',
-          errorMessage: '麦克风权限被拒绝，请在微信设置中开启后重试'
+          errorMessage: '麦克风权限被拒绝，请在微信设置中开启后重试',
+          holdBtnText: '按住说话'
         })
       } else {
         this.setData({
           stage: 'error',
-          errorMessage: '录音失败：' + errMsg.slice(0, 50)
+          errorMessage: '录音失败：' + errMsg.slice(0, 50),
+          holdBtnText: '按住说话'
         })
       }
     })
@@ -136,72 +169,102 @@ Page({
     })
   },
 
-  async checkMicPermission() {
-    // 1. 先过隐私协议（微信新规：scope.record 必须先同意隐私协议）
-    const privacyOk = await this.requirePrivacyAuthorize()
-    if (!privacyOk) {
-      console.log('[voice-entry] privacy not authorized, abort')
-      return false
-    }
-
-    try {
-      const setting = await wx.getSetting()
-      const recordAuth = setting.authSetting['scope.record']
-      console.log('[voice-entry] checkMicPermission authSetting:', setting.authSetting, 'recordAuth:', recordAuth)
-      // 已授权
-      if (recordAuth === true) {
-        console.log('[voice-entry] permission already granted')
-        return true
-      }
-      // 明确拒绝过 → 引导去设置
-      if (recordAuth === false) {
-        console.log('[voice-entry] permission denied before, guide to setting')
-        const confirmed = await new Promise(resolve => {
-          wx.showModal({
-            title: '需要麦克风权限',
-            content: '语音记账需要使用麦克风，请在设置中开启',
-            confirmText: '去设置',
-            success: (res) => resolve(res.confirm),
-            fail: () => resolve(false)
-          })
-        })
-        if (confirmed) {
-          const settingRes = await wx.openSetting()
-          const granted = settingRes.authSetting['scope.record'] === true
-          console.log('[voice-entry] openSetting result:', granted)
-          return granted
-        }
-        return false
-      }
-      // 从未问过 → 返回 true，由 recorderManager.start() 触发系统授权弹窗
-      console.log('[voice-entry] permission not asked, recorderManager.start() will trigger')
-      return true
-    } catch (err) {
-      console.error('[voice-entry] checkMicPermission failed:', err)
-      return true
-    }
-  },
-
-  async startRecording() {
-    console.log('[voice-entry] startRecording called')
+  // 进入页面时预准备：session + 隐私协议 + 麦克风权限
+  // 目的：让用户按住按钮时权限已就绪，避免 touchstart 期间异步弹窗的时序问题
+  async prepareForRecording() {
     const app = getApp()
     const session = await app.ensureSession()
     if (!session.authenticated) {
       wx.navigateTo({ url: '/pages/login/login' })
       return
     }
-    const ok = await this.checkMicPermission()
-    console.log('[voice-entry] checkMicPermission result:', ok)
-    if (!ok) {
-      this.setData({
-        stage: 'error',
-        errorMessage: '需要麦克风权限才能录音，请在设置中开启后重试'
-      })
+    // 隐私协议（微信新规：scope.record 必须先同意隐私协议）
+    const privacyOk = await this.requirePrivacyAuthorize()
+    if (!privacyOk) {
+      console.log('[voice-entry] privacy not authorized')
+      this.setData({ stage: 'error', errorMessage: '需要同意隐私协议才能使用语音记账' })
       return
     }
-    this.setData({ stage: 'recording', recordingSeconds: 0, transcript: '', items: [], errorMessage: '' })
-    console.log('[voice-entry] calling recorderManager.start()')
-    // recorderManager.start() 在未授权时会自动触发系统授权弹窗
+    await this.prepareMicPermission()
+  },
+
+  // 静默预检查麦克风权限：已授权则标记就绪；拒绝过则标记需引导；从未问过则主动请求
+  async prepareMicPermission() {
+    try {
+      const setting = await wx.getSetting()
+      const recordAuth = setting.authSetting['scope.record']
+      console.log('[voice-entry] prepareMicPermission recordAuth:', recordAuth)
+      if (recordAuth === true) {
+        this._permReady = true
+        this._permDenied = false
+        return
+      }
+      if (recordAuth === false) {
+        this._permReady = false
+        this._permDenied = true
+        return
+      }
+      // 从未问过 → 主动请求授权（避免按住时弹窗的时序问题）
+      const authorized = await new Promise(resolve => {
+        wx.authorize({
+          scope: 'scope.record',
+          success: () => resolve(true),
+          fail: () => resolve(false)
+        })
+      })
+      this._permReady = authorized
+      this._permDenied = !authorized
+      console.log('[voice-entry] authorize result:', authorized)
+    } catch (err) {
+      console.error('[voice-entry] prepareMicPermission failed:', err)
+      // 出错时不阻塞，让 onHoldStart 再尝试
+    }
+  },
+
+  // 权限被拒绝时引导用户去设置
+  async guideToSetting() {
+    const confirmed = await new Promise(resolve => {
+      wx.showModal({
+        title: '需要麦克风权限',
+        content: '语音记账需要使用麦克风，请在设置中开启',
+        confirmText: '去设置',
+        success: (res) => resolve(res.confirm),
+        fail: () => resolve(false)
+      })
+    })
+    if (confirmed) {
+      const settingRes = await wx.openSetting()
+      const granted = settingRes.authSetting['scope.record'] === true
+      this._permReady = granted
+      this._permDenied = !granted
+      console.log('[voice-entry] openSetting result:', granted)
+    }
+  },
+
+  // ===== 按住说话交互 =====
+
+  onHoldStart(e) {
+    if (this.data.stage === 'recording') return
+    if (this._permDenied) {
+      this.guideToSetting()
+      return
+    }
+    if (!this._permReady) {
+      // 权限准备中（prepareForRecording 还在执行或失败）
+      this.setData({ stage: 'error', errorMessage: '权限准备中，请稍后再试' })
+      return
+    }
+    this._cancelled = false
+    this._startY = e.touches[0].clientY
+    this.setData({
+      stage: 'recording',
+      recordingSeconds: 0,
+      wantCancel: false,
+      holdBtnText: '松开结束',
+      transcript: '',
+      items: [],
+      errorMessage: ''
+    })
     this.recorderManager.start({
       duration: MAX_RECORD_MS,
       sampleRate: SAMPLE_RATE,
@@ -211,15 +274,33 @@ Page({
     })
   },
 
-  stopRecording() {
+  onHoldMove(e) {
+    if (this.data.stage !== 'recording') return
+    const y = e.touches[0].clientY
+    const deltaY = this._startY - y
+    // 上滑超过 60px 触发取消
+    if (deltaY > 60 && !this.data.wantCancel) {
+      this.setData({ wantCancel: true, holdBtnText: '松开取消' })
+    } else if (deltaY <= 60 && this.data.wantCancel) {
+      this.setData({ wantCancel: false, holdBtnText: '松开结束' })
+    }
+  },
+
+  onHoldEnd() {
+    if (this.data.stage !== 'recording') return
+    if (this.data.wantCancel) {
+      this._cancelled = true
+    }
     this.clearTimers()
     this.recorderManager.stop()
   },
 
-  cancelRecording() {
+  onHoldCancel() {
+    // touchcancel（手指滑出按钮区域、系统打断等）视为取消
+    if (this.data.stage !== 'recording') return
+    this._cancelled = true
     this.clearTimers()
     this.recorderManager.stop()
-    this.setData({ stage: 'idle', transcript: '', items: [], errorMessage: '' })
   },
 
   // 上传音频到云存储 → 调用 voice-entry recognize action
@@ -249,6 +330,11 @@ Page({
       })
       const result = recognizeRes.result
       if (!result || !result.success) {
+        console.error('voice-entry recognize failed:', {
+          errorCode: result?.errorCode,
+          error: result?.error,
+          raw: result
+        })
         this.setData({
           stage: 'error',
           errorMessage: result?.error || '识别失败，请重试'
@@ -279,7 +365,9 @@ Page({
       transcript: '',
       items: [],
       errorMessage: '',
-      requestId: generateId()
+      requestId: generateId(),
+      wantCancel: false,
+      holdBtnText: '按住说话'
     })
   },
 
@@ -310,6 +398,12 @@ Page({
       })
       const result = res.result
       if (!result || !result.success) {
+        console.error('voice-entry parse failed:', {
+          errorCode: result?.errorCode,
+          error: result?.error,
+          usedAI: result?.usedAI,
+          raw: result
+        })
         this.setData({
           stage: 'error',
           errorMessage: result?.error || '解析失败，请重试或转手工记账'
@@ -405,32 +499,37 @@ Page({
   },
 
   onItemCategoryTap(e) {
-    const { itemId, type } = e.currentTarget.dataset
-    const categories = (this.data.categories || []).filter(c => c.type === type)
-    if (categories.length === 0) {
-      wx.showToast({ title: '暂无可用分类', icon: 'none' })
-      return
-    }
-    const itemList = categories.map(c => c.name)
-    wx.showActionSheet({
-      itemList,
-      success: (res) => {
-        const selected = categories[res.tapIndex]
-        const items = this.data.items.map(item =>
-          item.itemId === itemId
-            ? {
-                ...item,
-                categoryId: selected._id,
-                categoryName: selected.name,
-                needsReview: false,
-                warnings: []
-              }
-            : item
-        )
-        this.setData({ items })
-        this.updateCanConfirm()
-      }
+    const { itemId } = e.currentTarget.dataset
+    const target = this.data.items.find(i => i.itemId === itemId)
+    if (!target) return
+    this.setData({
+      showCategoryPicker: true,
+      pickerType: target.type,
+      pickerTargetItemId: itemId
     })
+  },
+
+  closeCategoryPicker() {
+    this.setData({ showCategoryPicker: false, pickerTargetItemId: null })
+  },
+
+  onCategorySelect(e) {
+    const selected = e.detail || {}
+    const itemId = this.data.pickerTargetItemId
+    if (!itemId) return
+    const items = this.data.items.map(item =>
+      item.itemId === itemId
+        ? {
+            ...item,
+            categoryId: selected.categoryId,
+            categoryName: selected.categoryName || selected.name || '',
+            needsReview: false,
+            warnings: []
+          }
+        : item
+    )
+    this.setData({ items, showCategoryPicker: false, pickerTargetItemId: null })
+    this.updateCanConfirm()
   },
 
   deleteItem(e) {
@@ -506,7 +605,7 @@ Page({
         submitting: false,
         successCount: (result.recordIds || []).length,
         showBudgetAlert: !!alert,
-        budgetAlertView: alert
+        budgetAlertView: alert ? budgetAlertContent(alert) : null
       })
     } catch (err) {
       console.error('batchCreate failed:', err)
@@ -533,7 +632,9 @@ Page({
       requestId: generateId(),
       successCount: 0,
       showBudgetAlert: false,
-      budgetAlertView: null
+      budgetAlertView: null,
+      wantCancel: false,
+      holdBtnText: '按住说话'
     })
   }
 })

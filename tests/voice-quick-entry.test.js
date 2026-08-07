@@ -10,7 +10,7 @@ function readSource(relativePath) {
 }
 
 // ===== local-parser 实际功能测试（可 require） =====
-const { parseTranscript, parseAmount, parseDate, inferType, detectComplexSemantics, splitSegments } = require(path.join(root, 'cloudfunctions/voice-entry/local-parser.js'))
+const { parseTranscript, parseAmount, parseDate, inferType, splitSegments } = require(path.join(root, 'cloudfunctions/voice-entry/local-parser.js'))
 
 const SAMPLE_CATEGORIES = [
   { _id: 'cat-lunch', name: '午餐', type: 'expense' },
@@ -56,11 +56,12 @@ test('inferType 推断收支类型', () => {
   assert.equal(inferType('吃饭'), null)
 })
 
-test('detectComplexSemantics 检测复杂金融语义', () => {
-  assert.ok(detectComplexSemantics('和朋友AA'))
-  assert.ok(detectComplexSemantics('转账给微信'))
-  assert.ok(detectComplexSemantics('借出100'))
-  assert.equal(detectComplexSemantics('午饭30元'), null)
+test('local-parser 不再对复杂金融语义一刀切拦截', () => {
+  // 移除了 detectComplexSemantics，AA/转账/报销等词应正常走规则或 AI 兜底
+  const source = readSource('cloudfunctions/voice-entry/local-parser.js')
+  assert.doesNotMatch(source, /function detectComplexSemantics/)
+  // "报销"作为收入关键词仍保留
+  assert.match(source, /报销到账/)
 })
 
 test('splitSegments 按分隔符拆分多笔', () => {
@@ -113,12 +114,15 @@ test('parseTranscript 未知分类触发 Hy3 兜底', () => {
   assert.equal(result.needsAI, true)
 })
 
-test('parseTranscript 复杂金融语义标记 needsReview', () => {
+test('parseTranscript 复杂金融语义不再标记为不支持', () => {
   const result = parseTranscript('和朋友AA吃饭100元', SAMPLE_CATEGORIES, { now: new Date(2026, 7, 1) })
-  assert.equal(result.items.length, 1)
-  assert.equal(result.items[0].needsReview, true)
-  assert.ok(result.items[0].warnings.length > 0)
-  assert.match(result.items[0].warnings[0], /AA/)
+  // AA 不再被一刀切拦截，"AA吃饭"分类匹配不到 → needsAI 兜底，或正常解析
+  // 关键：不应有 warnings 含 "不支持"
+  for (const item of result.items) {
+    for (const w of (item.warnings || [])) {
+      assert.doesNotMatch(w, /不支持/)
+    }
+  }
 })
 
 // ===== hy3-parser 静态校验测试（不 require 模块，避免依赖 wx-server-sdk） =====
@@ -223,11 +227,22 @@ test('voice-entry ASR 限制音频时长和频率', () => {
   assert.match(indexSource, /MAX_AUDIO_BYTES/)
 })
 
-test('voice-entry Hy3 使用 hunyuan-v3 provider', () => {
+test('voice-entry Hy3 通过 TokenHub OpenAI 兼容接口调用混元', () => {
   const source = readSource('cloudfunctions/voice-entry/hy3-parser.js')
-  assert.match(source, /hunyuan-v3/)
-  assert.match(source, /cloud\.ai/)
-  assert.match(source, /wx-server-sdk 版本/)
+  // 使用 TokenHub OpenAI 兼容接口（旧版 hunyuan.tencentcloudapi.com 已下线）
+  assert.match(source, /tokenhub\.tencentmaas\.com/)
+  assert.match(source, /\/v1\/chat\/completions/)
+  assert.match(source, /TOKENHUB_MODEL = 'hy3'/)
+  // 使用独立的 TOKENHUB_API_KEY 环境变量（与 ASR 的 SecretId/Key 分离）
+  assert.match(source, /TOKENHUB_API_KEY/)
+  // Bearer Token 鉴权
+  assert.match(source, /Bearer \$\{apiKey\}/)
+  // 不应再引用旧的 TC3 签名 / cloud.extend.AI / crypto
+  assert.doesNotMatch(source, /cloud\.extend\.AI/)
+  assert.doesNotMatch(source, /cloud\.ai\.createModel/)
+  assert.doesNotMatch(source, /HUNYUAN_ENDPOINT/)
+  assert.doesNotMatch(source, /TC3-HMAC-SHA256/)
+  assert.doesNotMatch(source, /require\('crypto'\)/)
 })
 
 test('voice-entry Hy3 返回 JSON schema 校验', () => {
@@ -239,27 +254,26 @@ test('voice-entry Hy3 返回 JSON schema 校验', () => {
 })
 
 // ===== 前端入口和页面静态校验 =====
-test('首页 goToAdd 改为动作面板而非直接跳转', () => {
+test('首页 goToAdd 直接跳转手工记账 + 麦克风按钮进语音记账', () => {
   const source = readSource('miniprogram/pages/index/index.js')
-  assert.match(source, /showAddActionSheet: true/)
-  assert.match(source, /closeAddActionSheet/)
-  assert.match(source, /goToManualAdd/)
+  assert.match(source, /\/pages\/add\/add/)
   assert.match(source, /goToVoiceAdd/)
   assert.match(source, /\/pages\/voice-entry\/voice-entry/)
+  assert.doesNotMatch(source, /showAddActionSheet/)
+  assert.doesNotMatch(source, /closeAddActionSheet/)
 })
 
-test('首页 wxml 包含动作面板 UI', () => {
+test('首页 wxml 包含麦克风按钮', () => {
   const wxml = readSource('miniprogram/pages/index/index.wxml')
-  assert.match(wxml, /showAddActionSheet/)
-  assert.match(wxml, /action-sheet-mask/)
-  assert.match(wxml, /goToManualAdd/)
+  assert.match(wxml, /mic-btn/)
   assert.match(wxml, /goToVoiceAdd/)
+  assert.doesNotMatch(wxml, /action-sheet-mask/)
 })
 
-test('首页 wxss 包含动作面板样式', () => {
+test('首页 wxss 包含麦克风按钮样式', () => {
   const wxss = readSource('miniprogram/pages/index/index.wxss')
-  assert.match(wxss, /\.action-sheet-mask/)
-  assert.match(wxss, /\.action-sheet/)
+  assert.match(wxss, /\.mic-btn/)
+  assert.doesNotMatch(wxss, /\.action-sheet-mask/)
 })
 
 test('voice-entry 页面注册到 app.json', () => {
@@ -304,6 +318,8 @@ test('voice-entry 页面预览逐项编辑功能', () => {
   assert.match(js, /onItemDateChange/)
   assert.match(js, /onItemRemarkInput/)
   assert.match(js, /onItemCategoryTap/)
+  assert.match(js, /onCategorySelect/)
+  assert.match(js, /closeCategoryPicker/)
   assert.match(js, /deleteItem/)
 })
 

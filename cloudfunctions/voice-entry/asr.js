@@ -121,12 +121,6 @@ async function recognize(audioBase64, openId) {
     throw err
   }
 
-  if (!checkRateLimit(openId)) {
-    const err = new Error('请求过于频繁，请稍后再试')
-    err.errorCode = 'RATE_LIMITED'
-    throw err
-  }
-
   // SentenceRecognition 请求参数
   // ProjectId=0 默认项目；SubServiceType=2 一句话识别
   // EngSerViceType=16k_zh；SourceType=1 表示音频为 Base64

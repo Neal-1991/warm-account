@@ -13,34 +13,63 @@
   padding-top: 120rpx;
 }
 
-.record-visual {
+/* ===== 按住说话按钮 ===== */
+.hold-btn {
   position: relative;
-  width: 200rpx;
-  height: 200rpx;
+  width: 240rpx;
+  height: 240rpx;
   border-radius: 50%;
   background: var(--theme-surface, #FFFFFF);
+  border: 4rpx solid var(--theme-accent, #6F8F4E);
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   box-shadow: 0 4rpx 24rpx rgba(43, 57, 38, 0.12);
   margin-bottom: 60rpx;
+  transition: transform 0.15s, background 0.15s, border-color 0.15s;
 }
 
-.record-icon {
-  font-size: 80rpx;
+.hold-btn.recording {
+  background: var(--theme-accent, #6F8F4E);
+  border-color: var(--theme-accent, #6F8F4E);
+  transform: scale(1.05);
 }
 
-.record-ring {
+.hold-btn.recording::before {
+  content: '';
   position: absolute;
-  width: 100%;
-  height: 100%;
+  inset: -8rpx;
   border-radius: 50%;
   border: 4rpx solid var(--theme-accent, #6F8F4E);
-  opacity: 0.3;
+  opacity: 0.4;
+  animation: record-pulse 1.2s infinite;
 }
 
-.record-visual.recording .record-ring {
-  animation: record-pulse 1.2s infinite;
+.hold-btn.cancel {
+  border-color: #D94A43;
+  background: rgba(217, 74, 67, 0.08);
+}
+
+.hold-icon {
+  font-size: 80rpx;
+  line-height: 1;
+  margin-bottom: 12rpx;
+}
+
+.hold-text {
+  font-size: 24rpx;
+  color: var(--theme-accent, #6F8F4E);
+}
+
+.hold-btn.recording .hold-icon,
+.hold-btn.recording .hold-text {
+  color: #FFFFFF;
+}
+
+.hold-btn.cancel .hold-icon,
+.hold-btn.cancel .hold-text {
+  color: #D94A43;
 }
 
 @keyframes record-pulse {
@@ -61,7 +90,7 @@
   align-items: center;
   font-size: 26rpx;
   color: var(--theme-muted, #999);
-  margin-bottom: 80rpx;
+  margin-bottom: 20rpx;
 }
 
 .record-hint text {
@@ -72,19 +101,9 @@
   color: var(--theme-muted-light, #BBB);
 }
 
-.record-actions {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  max-width: 560rpx;
-}
-
-.record-btn {
-  margin-bottom: 20rpx;
-  height: 88rpx;
-  line-height: 88rpx;
-  border-radius: 44rpx;
-  font-size: 32rpx;
+.record-hint-extra {
+  color: var(--theme-muted-light, #BBB) !important;
+  font-size: 24rpx;
 }
 
 /* ===== Loading 阶段 ===== */

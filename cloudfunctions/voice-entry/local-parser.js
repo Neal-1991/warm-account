@@ -128,17 +128,6 @@ function matchCategory(text, categories, type) {
   return null
 }
 
-// 检测复杂金融语义，返回 warning 字符串
-function detectComplexSemantics(text) {
-  const complexPatterns = ['AA', 'aa', '分摊', '转账', '转给', '借出', '借入', '还钱', '还款', '报销']
-  for (const pattern of complexPatterns) {
-    if (text.includes(pattern)) {
-      return `检测到"${pattern}"，当前 MVP 不支持自动计算，请确认后修改为普通收支`
-    }
-  }
-  return null
-}
-
 // 提取备注：去除金额、日期、收支词、分类名后的剩余文本（简化版）
 function extractRemark(text, categoryName) {
   let remark = text
@@ -199,26 +188,6 @@ function parseTranscript(transcript, categories = [], options = {}) {
     const date = parseDate(seg, now) || formatDate(now)
     const category = type ? matchCategory(seg, categories, type) : null
 
-    // 复杂金融语义直接标记
-    const complexWarning = detectComplexSemantics(seg)
-
-    if (complexWarning) {
-      items.push({
-        itemId: `item-${i + 1}`,
-        type: type || 'expense',
-        amountFen: amount || 0,
-        categoryId: category?.categoryId || null,
-        categoryName: category?.categoryName || '',
-        date,
-        remark: seg,
-        confidence: 0,
-        needsReview: true,
-        source: 'rule',
-        warnings: [complexWarning]
-      })
-      continue
-    }
-
     // 关键字段缺失 → 需 AI 兜底
     if (amount === null || type === null || category === null) {
       needsAI = true
@@ -250,6 +219,5 @@ module.exports = {
   parseDate,
   inferType,
   matchCategory,
-  detectComplexSemantics,
   splitSegments
 }

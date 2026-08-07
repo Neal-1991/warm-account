@@ -407,11 +407,17 @@ exports.main = async (event, context) => {
         }
 
         // 1. 幂等检查：按 voiceRequestId 查询已处理请求
-        const existingRes = await db.collection(collectionName('voiceRequests')).where({
-          openId,
-          requestId
-        }).limit(1).get()
-        const existing = existingRes.data[0]
+        //    best-effort：集合未创建时降级为不做幂等、直接写入（与 mark processing/completed 的 non-fatal 策略保持一致）
+        let existing = null
+        try {
+          const existingRes = await db.collection(collectionName('voiceRequests')).where({
+            openId,
+            requestId
+          }).limit(1).get()
+          existing = existingRes.data[0]
+        } catch (idempotencyErr) {
+          console.warn('voiceRequests idempotency query failed (non-fatal):', idempotencyErr.message)
+        }
         if (existing && existing.status === 'completed') {
           return {
             success: true,

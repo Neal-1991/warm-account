@@ -102,28 +102,10 @@
     </view>
   </view>
 
-  <view class="add-btn" bindtap="goToAdd">
+  <view class="add-btn" bindtap="goToAdd" hover-class="add-btn-hover" hover-stay-time="100">
     <text>+</text>
   </view>
-
-  <view wx:if="{{showAddActionSheet}}" class="action-sheet-mask" bindtap="closeAddActionSheet">
-    <view class="action-sheet" catchtap="">
-      <view class="action-sheet-title">选择记账方式</view>
-      <view class="action-sheet-item" bindtap="goToManualAdd">
-        <text class="action-sheet-icon">✍️</text>
-        <view class="action-sheet-text">
-          <text class="action-sheet-label">手工记账</text>
-          <text class="action-sheet-desc">逐项填写金额、分类、日期</text>
-        </view>
-      </view>
-      <view class="action-sheet-item" bindtap="goToVoiceAdd">
-        <text class="action-sheet-icon">🎤</text>
-        <view class="action-sheet-text">
-          <text class="action-sheet-label">语音记账</text>
-          <text class="action-sheet-desc">说一句话快速记多笔</text>
-        </view>
-      </view>
-      <view class="action-sheet-cancel" bindtap="closeAddActionSheet">取消</view>
-    </view>
+  <view class="mic-btn" bindtap="goToVoiceAdd" hover-class="mic-btn-hover" hover-stay-time="100">
+    <text>🎤</text>
   </view>
 </view>

@@ -2,7 +2,7 @@
 // 语音快速记账云函数：recognize（ASR）+ parse（规则优先 + Hy3 兜底）
 
 const cloud = require('wx-server-sdk')
-const { recognize } = require('./asr')
+const { recognize, checkRateLimit } = require('./asr')
 const { parseTranscript } = require('./local-parser')
 const { parseWithHy3 } = require('./hy3-parser')
 
@@ -39,6 +39,15 @@ exports.main = async (event, context) => {
           return { success: false, error: 'fileID or audioBase64 is required' }
         }
 
+        // 用户级频率限制（在重试循环外，只检查一次，避免内部重试被自己挡住）
+        if (!checkRateLimit(openId)) {
+          return {
+            success: false,
+            error: '请求过于频繁，请稍后再试',
+            errorCode: 'RATE_LIMITED'
+          }
+        }
+
         let base64Data = audioBase64
         let downloadedFileID = null
         try {
@@ -68,7 +77,7 @@ exports.main = async (event, context) => {
             } catch (err) {
               lastErr = err
               // 鉴权/额度/参数错误不重试
-              if (['ASR_NOT_CONFIGURED', 'RATE_LIMITED', 'ASR_SERVICE_UNAVAILABLE'].includes(err.errorCode)) {
+              if (['ASR_NOT_CONFIGURED', 'ASR_SERVICE_UNAVAILABLE'].includes(err.errorCode)) {
                 break
               }
               // 最后一次失败抛出
@@ -78,6 +87,11 @@ exports.main = async (event, context) => {
           }
 
           if (!asrResult) {
+            console.error('ASR recognize failed:', {
+              errorCode: lastErr?.errorCode || 'ASR_FAILED',
+              errorMessage: String(lastErr?.message || lastErr || '').slice(0, 200),
+              openId
+            })
             const userError = lastErr?.errorCode === 'RATE_LIMITED'
               ? '请求过于频繁，请稍后再试'
               : '识别失败，请重试或转手工记账'

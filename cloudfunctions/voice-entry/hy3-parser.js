@@ -1,9 +1,16 @@
 // cloudfunctions/voice-entry/hy3-parser.js
-// Hy3 兜底解析：通过 CloudBase SDK 调用 hunyuan-v3 provider
+// Hy3 兜底解析：通过腾讯云 TokenHub OpenAI 兼容接口调用混元大模型
+// 旧版 hunyuan.tencentcloudapi.com 接口和 hunyuan-turbo 等模型已于 2026-06-22 下线，
+// 全部迁移到 TokenHub（https://tokenhub.tencentmaas.com/v1/chat/completions）
+// 使用独立的 TOKENHUB_API_KEY 环境变量（与 ASR 的 SecretId/SecretKey 分离）
 // 只返回固定 JSON，服务端二次校验
-// cloud.init 由 voice-entry/index.js 统一完成，此处不重复
 
-const cloud = require('wx-server-sdk')
+const https = require('https')
+
+const TOKENHUB_HOST = 'tokenhub.tencentmaas.com'
+const TOKENHUB_PATH = '/v1/chat/completions'
+const TOKENHUB_MODEL = 'hy3'
+const TOKENHUB_TIMEOUT_MS = 15000
 
 const SYSTEM_PROMPT = `你是一个家庭记账解析助手。用户会说一句或多句关于收支的话，你需要把它解析成结构化记账草稿。
 
@@ -22,42 +29,105 @@ const SYSTEM_PROMPT = `你是一个家庭记账解析助手。用户会说一句
 3. 收支类型词：花了/买了/支付/支出/消费 → expense；收到/工资/奖金/报销到账/收入 → income
 4. 日期：今天/昨天/前天/本月X号 等相对日期必须转换为 YYYY-MM-DD；没有明确日期用今天
 5. 多笔记录按"，""、""然后""另外""还有"等分隔
-6. 不支持的复杂语义：AA分摊、转账、借贷、还款、退款冲销 → 不要猜测，把该片段原样放入 remark，type 设为 "expense"，amountYuan 设为 0
-7. 金额必须为正数，不能为负
-8. 不要凭空生成 categoryId，只返回 categoryName
+6. 分类选择策略：优先选择与语义最匹配的小类（如"中饭/午饭"应选"午餐"小类而非"餐饮"大类）；若没有合适的小类，再选择所属大类
+7. 无法确定的语义（如 AA分摊、转账等）→ 按字面理解解析为普通收支，把原话放入 remark；不要拒绝解析
+8. 金额必须为正数，不能为负
+9. 不要凭空生成 categoryId，只返回 categoryName
 
-categories 列表（按 type 过滤后的分类名称）：
+categories 列表（格式：名称(类型)[大类]或 名称(类型)[小类/所属大类]）：
 {{CATEGORIES}}
 
 当前时间：{{NOW}}`
 
-const PARSE_TIMEOUT_MS = 15000
 const MAX_REPAIR_ATTEMPTS = 1
 
 function buildPrompt(transcript, categories, now) {
+  // 构建大类 ID → 名称 映射，用于标注小类所属大类
+  const parentMap = {}
+  for (const c of (categories || [])) {
+    if (!c.parentId) {
+      parentMap[c._id] = c.name
+    }
+  }
   const categoryNames = (categories || [])
-    .map(c => `${c.name}(${c.type})`)
+    .map(c => {
+      const parentName = c.parentId ? parentMap[c.parentId] : null
+      const tag = parentName ? `[小类/属于${parentName}]` : '[大类]'
+      return `${c.name}(${c.type})${tag}`
+    })
     .join('、') || '无可用分类'
   return SYSTEM_PROMPT
     .replace('{{CATEGORIES}}', categoryNames)
     .replace('{{NOW}}', now.toISOString())
 }
 
-// 调用 Hy3，返回原始文本
+// TokenHub OpenAI 兼容接口调用
+function tokenhubHttpsPost(payload, apiKey) {
+  return new Promise((resolve, reject) => {
+    const bodyStr = JSON.stringify(payload)
+    const req = https.request({
+      hostname: TOKENHUB_HOST,
+      port: 443,
+      path: TOKENHUB_PATH,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Length': Buffer.byteLength(bodyStr)
+      },
+      timeout: TOKENHUB_TIMEOUT_MS
+    }, (res) => {
+      let data = ''
+      res.on('data', chunk => { data += chunk })
+      res.on('end', () => {
+        try {
+          resolve(JSON.parse(data))
+        } catch (err) {
+          reject(new Error('混元响应解析失败'))
+        }
+      })
+    })
+    req.on('timeout', () => {
+      req.destroy(new Error('混元请求超时'))
+    })
+    req.on('error', reject)
+    req.write(bodyStr)
+    req.end()
+  })
+}
+
+// 调用混元大模型，返回原始文本
 async function callHy3(systemContent, userContent) {
-  const ai = cloud.ai
-  if (typeof ai !== 'function') {
-    throw new Error('cloud.ai 不可用，请确认 wx-server-sdk 版本 >= 3.0.5-beta.1')
+  const apiKey = process.env.TOKENHUB_API_KEY
+  if (!apiKey) {
+    const err = new Error('混元服务未配置')
+    err.errorCode = 'HUNYUAN_NOT_CONFIGURED'
+    throw err
   }
-  const model = ai.createModel('hunyuan-v3')
-  const res = await model.text({
+
+  // OpenAI 兼容格式
+  const payload = {
+    model: TOKENHUB_MODEL,
     messages: [
       { role: 'system', content: systemContent },
       { role: 'user', content: userContent }
-    ],
-    timeout: PARSE_TIMEOUT_MS
-  })
-  return res?.text || res?.choices?.[0]?.message?.content || ''
+    ]
+  }
+
+  const res = await tokenhubHttpsPost(payload, apiKey)
+
+  // OpenAI 兼容错误格式：{ error: { message, type, code } }
+  if (res.error) {
+    const err = new Error(res.error.message || '混元调用失败')
+    err.errorCode = res.error.code || res.error.type || 'HUNYUAN_API_ERROR'
+    throw err
+  }
+
+  const choices = res.choices
+  if (!choices || !choices.length) {
+    throw new Error('混元返回空内容')
+  }
+  return choices[0].message.content || ''
 }
 
 // 提取 JSON 数组（容错：去除 Markdown 围栏、前后自然语言）
@@ -85,8 +155,21 @@ function normalizeItem(raw, index, categories) {
   if (!Number.isFinite(amountYuan) || amountYuan <= 0) return null
   const amountFen = Math.round(amountYuan * 100)
   const categoryName = typeof raw.categoryName === 'string' ? raw.categoryName.trim() : ''
-  // 映射到真实分类 ID
-  const matched = (categories || []).find(c => c.name === categoryName && c.type === type)
+
+  // 分类匹配：优先小类精确匹配 → 大类精确匹配 → 模糊回退（先小类后大类）
+  const typed = (categories || []).filter(c => c.type === type)
+  const smallCategories = typed.filter(c => c.parentId)
+  const bigCategories = typed.filter(c => !c.parentId)
+
+  let matched = smallCategories.find(c => c.name === categoryName)
+    || bigCategories.find(c => c.name === categoryName)
+
+  // 模糊回退：categoryName 与分类名存在包含关系（应对 AI 返回近义词/简写）
+  if (!matched && categoryName) {
+    matched = smallCategories.find(c => c.name.includes(categoryName) || categoryName.includes(c.name))
+      || bigCategories.find(c => c.name.includes(categoryName) || categoryName.includes(c.name))
+  }
+
   const categoryId = matched ? matched._id : null
   // 校验日期
   const dateStr = typeof raw.date === 'string' ? raw.date : ''
@@ -126,7 +209,11 @@ async function parseWithHy3(transcript, categories = [], options = {}) {
     const msg = String(err?.message || err)
     console.error('Hy3 call failed:', {
       stage: 'hy3-call',
-      errorCategory: msg.includes('timeout') ? 'timeout' : 'service'
+      errorCategory: msg.includes('timeout') ? 'timeout' : 'service',
+      errorMessage: msg.slice(0, 500),
+      errCode: err?.errCode || err?.code || err?.requestId || null,
+      errStack: err?.stack ? String(err.stack).slice(0, 1000) : null,
+      rawErr: JSON.stringify(err, Object.getOwnPropertyNames(err)).slice(0, 1000)
     })
     throw new Error('解析服务暂不可用，请稍后重试或转手工记账')
   }

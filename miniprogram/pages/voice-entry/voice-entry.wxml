@@ -2,22 +2,27 @@
 
   <!-- idle / recording 录音阶段 -->
   <view wx:if="{{stage === 'idle' || stage === 'recording'}}" class="stage-record">
-    <view class="record-visual {{stage === 'recording' ? 'recording' : ''}}">
-      <view class="record-ring"></view>
-      <view class="record-icon">🎤</view>
+    <view
+      class="hold-btn {{stage === 'recording' ? 'recording' : ''}} {{wantCancel ? 'cancel' : ''}}"
+      bindtouchstart="onHoldStart"
+      bindtouchmove="onHoldMove"
+      bindtouchend="onHoldEnd"
+      bindtouchcancel="onHoldCancel"
+    >
+      <view class="hold-icon">🎤</view>
+      <text class="hold-text">{{holdBtnText}}</text>
     </view>
     <view class="record-status">
-      <text wx:if="{{stage === 'idle'}}">点击下方按钮开始说话</text>
+      <text wx:if="{{stage === 'idle'}}">按住按钮说话，松开自动识别</text>
+      <text wx:elif="{{wantCancel}}">松开手指取消本次录音</text>
       <text wx:else>录音中… {{recordingSeconds}}s / 30s</text>
     </view>
     <view class="record-hint">
       <text>支持一句话记多笔</text>
       <text>示例：今天午饭花了三十元，晚上收到工资五千</text>
     </view>
-    <view class="record-actions">
-      <button wx:if="{{stage === 'idle'}}" class="record-btn primary" bindtap="startRecording">开始录音</button>
-      <button wx:else class="record-btn primary" bindtap="stopRecording">停止录音</button>
-      <button wx:if="{{stage === 'recording'}}" class="record-btn ghost" bindtap="cancelRecording">取消</button>
+    <view class="record-hint">
+      <text class="record-hint-extra">向上滑动手指可取消录音</text>
     </view>
   </view>
 
@@ -110,7 +115,6 @@
             <view
               class="detail-category {{item.categoryId ? '' : 'placeholder'}}"
               data-item-id="{{item.itemId}}"
-              data-type="{{item.type}}"
               bindtap="onItemCategoryTap"
             >{{item.categoryName || '点击选择分类'}}</view>
           </view>
@@ -168,7 +172,7 @@
     <view class="success-icon">✓</view>
     <text class="success-title">已记账 {{successCount}} 笔</text>
     <view wx:if="{{showBudgetAlert}}" class="budget-alert">
-      <text class="budget-alert-title">预算提醒</text>
+      <text class="budget-alert-title">{{budgetAlertView.title || '预算提醒'}}</text>
       <text class="budget-alert-content">{{budgetAlertView.message || '该分类本月预算已接近上限'}}</text>
     </view>
     <view class="success-actions">
@@ -191,5 +195,15 @@
       <button class="btn primary" bindtap="goToManualAdd">手工记账</button>
     </view>
   </view>
+
+  <!-- 分类选择器（复用普通记账的 category-picker） -->
+  <category-picker
+    visible="{{showCategoryPicker}}"
+    categories="{{categories}}"
+    type="{{pickerType}}"
+    theme-style="{{themeStyle}}"
+    bind:select="onCategorySelect"
+    bind:close="closeCategoryPicker"
+  />
 
 </view>
