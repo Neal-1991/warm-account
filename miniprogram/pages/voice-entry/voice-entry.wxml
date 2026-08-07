@@ -1,0 +1,209 @@
+<view class="container" style="{{themeStyle}}">
+
+  <!-- idle / recording 录音阶段 -->
+  <view wx:if="{{stage === 'idle' || stage === 'recording'}}" class="stage-record">
+    <view
+      class="hold-btn {{stage === 'recording' ? 'recording' : ''}} {{wantCancel ? 'cancel' : ''}}"
+      bindtouchstart="onHoldStart"
+      bindtouchmove="onHoldMove"
+      bindtouchend="onHoldEnd"
+      bindtouchcancel="onHoldCancel"
+    >
+      <view class="hold-icon">🎤</view>
+      <text class="hold-text">{{holdBtnText}}</text>
+    </view>
+    <view class="record-status">
+      <text wx:if="{{stage === 'idle'}}">按住按钮说话，松开自动识别</text>
+      <text wx:elif="{{wantCancel}}">松开手指取消本次录音</text>
+      <text wx:else>录音中… {{recordingSeconds}}s / 30s</text>
+    </view>
+    <view class="record-hint">
+      <text>支持一句话记多笔</text>
+      <text>示例：今天午饭花了三十元，晚上收到工资五千</text>
+    </view>
+    <view class="record-hint">
+      <text class="record-hint-extra">向上滑动手指可取消录音</text>
+    </view>
+  </view>
+
+  <!-- recognizing 识别中 -->
+  <view wx:elif="{{stage === 'recognizing'}}" class="stage-loading">
+    <view class="loading-spinner"></view>
+    <text class="loading-text">正在识别语音…</text>
+    <text class="loading-subtext">识别完成后可以编辑文字</text>
+  </view>
+
+  <!-- editing-text 文本编辑 -->
+  <view wx:elif="{{stage === 'editing-text'}}" class="stage-edit-text">
+    <view class="edit-text-title">识别结果</view>
+    <textarea
+      class="transcript-input"
+      value="{{transcript}}"
+      bindinput="onTranscriptInput"
+      placeholder="识别文本（可编辑错别字）"
+      auto-height
+      maxlength="500"
+    />
+    <view class="edit-text-actions">
+      <button class="btn ghost" bindtap="retryRecording">重新录音</button>
+      <button class="btn primary" bindtap="startParse">继续解析</button>
+    </view>
+    <view class="edit-text-fallback">
+      <text bindtap="goToManualAdd">识别不准？转手工记账 ›</text>
+    </view>
+  </view>
+
+  <!-- parsing 解析中 -->
+  <view wx:elif="{{stage === 'parsing'}}" class="stage-loading">
+    <view class="loading-spinner"></view>
+    <text class="loading-text">正在解析记账内容…</text>
+    <text class="loading-subtext">规则不覆盖时使用 AI，可能稍慢</text>
+  </view>
+
+  <!-- preview 预览编辑 -->
+  <view wx:elif="{{stage === 'preview'}}" class="stage-preview">
+    <view class="preview-header">
+      <text class="preview-title">解析到 {{items.length}} 笔记录</text>
+      <text class="preview-hint">逐条核对后确认记账</text>
+    </view>
+
+    <view class="draft-list">
+      <view wx:for="{{items}}" wx:key="itemId" class="draft-item">
+        <view class="draft-header" data-item-id="{{item.itemId}}" bindtap="expandItem">
+          <view class="draft-type-badge {{item.type}}">
+            <text>{{item.type === 'income' ? '收入' : '支出'}}</text>
+          </view>
+          <view class="draft-summary">
+            <text class="draft-amount">¥{{item.amountYuan}}</text>
+            <text class="draft-category">{{item.categoryName || '未选择分类'}}</text>
+          </view>
+          <view wx:if="{{item.needsReview}}" class="draft-review-tag">需补充</view>
+          <text class="expand-arrow {{item.expanded ? 'expanded' : ''}}">›</text>
+        </view>
+
+        <view wx:if="{{item.expanded}}" class="draft-detail">
+          <view wx:for="{{item.warnings}}" wx:for-item="warning" wx:key="*this" class="draft-warning">
+            <text>⚠️ {{warning}}</text>
+          </view>
+
+          <view class="detail-row">
+            <text class="detail-label">类型</text>
+            <radio-group data-item-id="{{item.itemId}}" bindchange="onItemTypeChange">
+              <label class="radio-label">
+                <radio value="expense" checked="{{item.type === 'expense'}}" color="#6F8F4E"/>支出
+              </label>
+              <label class="radio-label">
+                <radio value="income" checked="{{item.type === 'income'}}" color="#6F8F4E"/>收入
+              </label>
+            </radio-group>
+          </view>
+
+          <view class="detail-row">
+            <text class="detail-label">金额</text>
+            <input
+              class="detail-input"
+              type="digit"
+              value="{{item.amountYuan}}"
+              data-item-id="{{item.itemId}}"
+              bindinput="onItemAmountInput"
+              placeholder="0.00"
+            />
+          </view>
+
+          <view class="detail-row">
+            <text class="detail-label">分类</text>
+            <view
+              class="detail-category {{item.categoryId ? '' : 'placeholder'}}"
+              data-item-id="{{item.itemId}}"
+              bindtap="onItemCategoryTap"
+            >{{item.categoryName || '点击选择分类'}}</view>
+          </view>
+
+          <view class="detail-row">
+            <text class="detail-label">日期</text>
+            <picker
+              mode="date"
+              value="{{item.date}}"
+              data-item-id="{{item.itemId}}"
+              bindchange="onItemDateChange"
+            >
+              <view class="detail-picker">{{item.date}}</view>
+            </picker>
+          </view>
+
+          <view class="detail-row">
+            <text class="detail-label">备注</text>
+            <input
+              class="detail-input"
+              value="{{item.remark}}"
+              data-item-id="{{item.itemId}}"
+              bindinput="onItemRemarkInput"
+              placeholder="备注（可选）"
+              maxlength="100"
+            />
+          </view>
+
+          <view class="detail-actions">
+            <text class="delete-btn" data-item-id="{{item.itemId}}" bindtap="deleteItem">删除此项</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="preview-actions">
+      <button class="btn ghost" bindtap="retryRecording">重新录音</button>
+      <button
+        class="btn primary {{!canConfirm ? 'disabled' : ''}}"
+        bindtap="confirmBatch"
+        disabled="{{!canConfirm}}"
+      >确认记账</button>
+    </view>
+  </view>
+
+  <!-- submitting 写入中 -->
+  <view wx:elif="{{stage === 'submitting'}}" class="stage-loading">
+    <view class="loading-spinner"></view>
+    <text class="loading-text">正在写入账本…</text>
+    <text class="loading-subtext">请勿离开页面</text>
+  </view>
+
+  <!-- success 成功 -->
+  <view wx:elif="{{stage === 'success'}}" class="stage-success">
+    <view class="success-icon">✓</view>
+    <text class="success-title">已记账 {{successCount}} 笔</text>
+    <view wx:if="{{showBudgetAlert}}" class="budget-alert">
+      <text class="budget-alert-title">{{budgetAlertView.title || '预算提醒'}}</text>
+      <text class="budget-alert-content">{{budgetAlertView.message || '该分类本月预算已接近上限'}}</text>
+    </view>
+    <view class="success-actions">
+      <button class="btn ghost" bindtap="recordAgain">再记一笔</button>
+      <button class="btn primary" bindtap="goToHome">返回首页</button>
+    </view>
+  </view>
+
+  <!-- error 失败 -->
+  <view wx:elif="{{stage === 'error'}}" class="stage-error">
+    <view class="error-icon">!</view>
+    <text class="error-title">{{errorMessage}}</text>
+    <view wx:if="{{transcript}}" class="error-preserve">
+      <text class="preserve-label">已保留识别文本：</text>
+      <text class="preserve-text">{{transcript}}</text>
+    </view>
+    <view class="error-actions">
+      <button wx:if="{{transcript}}" class="btn ghost" bindtap="startParse">重试解析</button>
+      <button wx:if="{{!transcript}}" class="btn ghost" bindtap="retryRecording">重新录音</button>
+      <button class="btn primary" bindtap="goToManualAdd">手工记账</button>
+    </view>
+  </view>
+
+  <!-- 分类选择器（复用普通记账的 category-picker） -->
+  <category-picker
+    visible="{{showCategoryPicker}}"
+    categories="{{categories}}"
+    type="{{pickerType}}"
+    theme-style="{{themeStyle}}"
+    bind:select="onCategorySelect"
+    bind:close="closeCategoryPicker"
+  />
+
+</view>

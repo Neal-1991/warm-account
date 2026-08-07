@@ -237,8 +237,39 @@
   z-index: 100;
 }
 
+.add-btn-hover {
+  opacity: 0.85;
+  transform: scale(0.94);
+}
+
 .add-btn text {
   font-size: 60rpx;
   font-weight: 300;
+  line-height: 1;
+}
+
+.mic-btn {
+  position: fixed;
+  right: 60rpx;
+  bottom: 120rpx;
+  width: 60rpx;
+  height: 60rpx;
+  border-radius: 50%;
+  background: var(--theme-surface, #FFFFFF);
+  box-shadow: 0 4rpx 16rpx rgba(43, 57, 38, 0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  border: 2rpx solid var(--theme-accent, #6F8F4E);
+}
+
+.mic-btn-hover {
+  opacity: 0.85;
+  transform: scale(0.94);
+}
+
+.mic-btn text {
+  font-size: 30rpx;
   line-height: 1;
 }

@@ -325,9 +325,20 @@ Page({
 
   async goToAdd() {
     const session = await getApp().ensureSession()
-    wx.navigateTo({
-      url: session.authenticated ? '/pages/add/add' : '/pages/login/login'
-    })
+    if (!session.authenticated) {
+      wx.navigateTo({ url: '/pages/login/login' })
+      return
+    }
+    wx.navigateTo({ url: '/pages/add/add' })
+  },
+
+  async goToVoiceAdd() {
+    const session = await getApp().ensureSession()
+    if (!session.authenticated) {
+      wx.navigateTo({ url: '/pages/login/login' })
+      return
+    }
+    wx.navigateTo({ url: '/pages/voice-entry/voice-entry' })
   },
 
   async goToBudget() {

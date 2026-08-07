@@ -393,6 +393,8 @@ test('family migration resumes after interruption without duplicate data', async
         delete item[key]
       } else if (value && value.__op === 'addToSet') {
         item[key] = Array.from(new Set([...(item[key] || []), value.value]))
+      } else if (value && value.__op === 'pull') {
+        item[key] = (item[key] || []).filter(v => v !== value.value)
       } else {
         item[key] = value
       }
@@ -449,6 +451,9 @@ test('family migration resumes after interruption without duplicate data', async
   const command = {
     addToSet(value) {
       return { __op: 'addToSet', value }
+    },
+    pull(value) {
+      return { __op: 'pull', value }
     },
     remove() {
       return { __op: 'remove' }

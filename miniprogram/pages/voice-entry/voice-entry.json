@@ -1,0 +1,7 @@
+{
+  "navigationBarTitleText": "语音记账",
+  "disableScroll": false,
+  "usingComponents": {
+    "category-picker": "/components/category-picker/category-picker"
+  }
+}

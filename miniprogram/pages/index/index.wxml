@@ -102,7 +102,10 @@
     </view>
   </view>
 
-  <view class="add-btn" bindtap="goToAdd">
+  <view class="add-btn" bindtap="goToAdd" hover-class="add-btn-hover" hover-stay-time="100">
     <text>+</text>
+  </view>
+  <view class="mic-btn" bindtap="goToVoiceAdd" hover-class="mic-btn-hover" hover-stay-time="100">
+    <text>🎤</text>
   </view>
 </view>

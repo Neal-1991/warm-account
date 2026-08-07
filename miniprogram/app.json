@@ -4,6 +4,7 @@
     "pages/login/login",
     "pages/statistics/statistics",
     "pages/add/add",
+    "pages/voice-entry/voice-entry",
     "pages/mine/mine",
     "pages/family/family",
     "pages/about/about",
@@ -28,5 +29,16 @@
     "navigationBarTitleText": "暖账",
     "navigationBarTextStyle": "white",
     "viewport-fit": "cover"
+  },
+  "permission": {
+    "scope.record": {
+      "desc": "用于语音记账功能，识别你的语音内容生成记账草稿"
+    }
+  },
+  "requiredPrivateInfos": [],
+  "__usePrivacyCheck__": true,
+  "__privacySetting__": {
+    "privacyContractName": "用户隐私保护指引",
+    "apis": ["scope.record"]
   }
 }

@@ -10,7 +10,8 @@ const COLLECTIONS = [
   { name: 'records', description: '账目记录集合' },
   { name: 'categories', description: '分类集合' },
   { name: 'members', description: '成员信息集合' },
-  { name: 'budgets', description: '月度预算集合' }
+  { name: 'budgets', description: '月度预算集合' },
+  { name: 'voiceRequests', description: '语音记账幂等请求集合' }
 ]
 
 // 环境后缀
@@ -41,8 +42,9 @@ exports.main = async (event, context) => {
         '2. 点击"云开发控制台"',
         '3. 进入"数据库"',
         '4. 点击"新建集合"',
-        '5. 分别创建: books_test, books_prod, records_test, records_prod, categories_test, categories_prod, members_test, members_prod, budgets_test, budgets_prod',
-        '6. 为 budgets_test 和 budgets_prod 创建 bookId + month 唯一索引'
+        '5. 分别创建: books_test, books_prod, records_test, records_prod, categories_test, categories_prod, members_test, members_prod, budgets_test, budgets_prod, voiceRequests_test, voiceRequests_prod',
+        '6. 为 budgets_test 和 budgets_prod 创建 bookId + month 唯一索引',
+        '7. 为 voiceRequests_test 和 voiceRequests_prod 创建 openId + requestId 唯一索引'
       ]
     }
 
