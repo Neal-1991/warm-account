@@ -2,3 +2,32 @@
 miniprogram/utils/env.js
 暖账的API key.md
 *.API key.md
+node_modules/
+.workbuddy/
+
+# AI 工具本地配置（不入库）
+.agents/
+.claude/
+.superpowers/
+.tmp/
+AGENTS.md
+CLAUDE.md
+
+# 备份与临时文件
+bak/
+*.bak
+
+# 本地资料（暂不推送）
+docs/budget-ui-mockup.html
+docs/category-ui-mockup.html
+小程序头像.png
+小程序头像二.png
+微信审核/
+
+# superpowers 新增未跟踪文档（暂不推送）
+docs/superpowers/plans/2026-05-05-warm-account.md
+docs/superpowers/plans/2026-08-07-wechat-devtools-automation-research.md
+docs/superpowers/specs/2026-05-05-principle.md
+docs/superpowers/specs/2026-05-05-warm-account-design.md.bak
+docs/superpowers/specs/2026-05-05-warm-account-privacy.md
+docs/superpowers/specs/2026-05-05-warm-account-terms.md
