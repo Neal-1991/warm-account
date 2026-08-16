@@ -4,5 +4,6 @@
 
 module.exports = {
   env: 'your-cloud-env-id',          // 云开发环境ID
-  appId: 'your-wechat-miniprogram-appid'  // 微信小程序 AppID
+  appId: 'your-wechat-miniprogram-appid',  // 微信小程序 AppID
+  isTest: false                      // true = 测试环境（*_test 集合），false = 生产环境（*_prod 集合）
 }

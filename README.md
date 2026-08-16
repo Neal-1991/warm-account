@@ -38,7 +38,8 @@ cp miniprogram/utils/env.example.js miniprogram/utils/env.js
 ```js
 module.exports = {
   env: 'your-cloud-env-id',
-  appId: 'your-miniprogram-appid'
+  appId: 'your-miniprogram-appid',
+  isTest: false  // true = 测试环境，false = 生产环境
 }
 ```
 
@@ -67,15 +68,15 @@ module.exports = {
 
 `voiceRequests_prod` 需创建 `openId` + `requestId` 组合唯一索引。
 
-如需测试环境，将 `config.js` 中 `isTest` 改为 `true`，并创建对应 `_test` 后缀集合。
+如需测试环境，将 `env.js` 中 `isTest` 改为 `true`，并创建对应 `_test` 后缀集合。
 
 ### 5. 切换环境
 
-编辑 `miniprogram/utils/config.js`：
+编辑 `miniprogram/utils/env.js`（本地文件，不入库）中的 `isTest` 字段：
 
 ```js
-const isTest = true   // 测试环境
-const isTest = false  // 生产环境
+isTest: true   // 测试环境
+isTest: false  // 生产环境
 ```
 
 ## 项目结构
@@ -111,7 +112,7 @@ const isTest = false  // 生产环境
 
 ## 环境切换
 
-通过 `miniprogram/utils/config.js` 中 `isTest` 字段控制：
+通过 `miniprogram/utils/env.js`（本地文件，不入库）中 `isTest` 字段控制：
 
 - `true`：操作 `_test` 后缀集合
 - `false`：操作 `_prod` 后缀集合

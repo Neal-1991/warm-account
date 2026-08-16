@@ -1,8 +1,9 @@
 // 环境配置
-// TODO: 修改 isTest 为 false 切换到生产环境
-const isTest = false  // true = 测试环境，false = 生产环境
-
+// 测试/生产切换：编辑同目录 env.js（不入库）中的 isTest 字段，模板见 env.example.js
 const envConfig = require('./env')
+
+// env.js 缺少 isTest 字段时默认生产环境，避免误读写测试集合
+const isTest = envConfig.isTest === true
 
 module.exports = {
   env: envConfig.env,  // 从 env.js 读取（不纳入版本控制）
